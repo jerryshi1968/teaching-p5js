@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* Split.js 拖拽条全局样式 */
+.gutter {
+  background-color: #2d2d2d;
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transition: background-color 0.2s;
+}
+.gutter:hover {
+  background-color: #4f46e5; /* 鼠标悬停时显示紫色激活色 */
+}
+.gutter.gutter-horizontal {
+  background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAeCAYAAAD67g0PAAAAD0lEQVQoU2NkQAOMpGgAADAQAAE9g18AAAAASUVORK5CYII=');
+  cursor: col-resize;
+  width: 8px !important;
+}
