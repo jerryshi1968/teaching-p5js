@@ -64,13 +64,35 @@ const EditorView = () => {
 
     loadProjectFiles();
 
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
+    return undefined;
   }, [projectId]);
 
   // 获取当前正在编辑的活动文件
   const activeFile = files.find(f => f.name === activeFileName);
+
+  const getProjectPreviewUrl = () => (
+    `/teaching-p5js/projects/${encodeURIComponent(projectId)}/index.html?t=${Date.now()}`
+  );
+
+  const saveFilesToServer = async (filesToSave) => {
+    const token = localStorage.getItem('teaching_token');
+
+    await Promise.all(filesToSave.map(async (file) => {
+      const response = await fetch(`/api/files/${file.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ content: file.content })
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || `${file.name} 保存失败了，请再试一次哦`);
+      }
+    }));
+  };
 
   // 3. 处理代码实时输入（更新到 React 内存状态中）
   const handleCodeChange = (newContent) => {
@@ -82,18 +104,7 @@ const EditorView = () => {
     if (!activeFile) return;
     setSaving(true);
     try {
-      const token = localStorage.getItem('teaching_token');
-      const response = await fetch(`/api/files/${activeFile.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ content: activeFile.content })
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || '保存失败了，请再试一次哦');
+      await saveFilesToServer([activeFile]);
 
       // 友好活泼的保存提示
       alert(`🎉 太棒了！"${activeFile.name}" 已成功存入你的魔法书架！`);
@@ -106,61 +117,42 @@ const EditorView = () => {
 
   // 5. 预览运行逻辑 (包含静默自动保存)
   const handleRun = async () => {
-    const htmlFile = files.find(f => f.name === 'index.html');
-    const cssFile = files.find(f => f.name === 'style.css');
-    const jsFile = files.find(f => f.name === 'sketch.js');
-
-    if (!htmlFile || !jsFile || !cssFile) return;
+    if (files.length === 0) return;
 
     // === 【自动静默保存】：运行代码时自动将数据上传至服务器 ===
-    if (activeFile) {
-      try {
-        const token = localStorage.getItem('teaching_token');
-        await fetch(`/api/files/${activeFile.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ content: activeFile.content })
-        });
-      } catch (e) {
-        console.warn('自动保存遇到了一点小麻烦:', e);
-      }
+    setSaving(true);
+    try {
+      await saveFilesToServer(files);
+      setPreviewUrl(getProjectPreviewUrl());
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
     }
-
-    // 动态拼接代码
-    let combinedHtml = htmlFile.content;
-
-    // 替换内存中最新的 CSS
-    combinedHtml = combinedHtml.replace(
-      /<link\s+rel="stylesheet"\s+type="text\/css"\s+href="style\.css">/i,
-      `<style>${cssFile.content}</style>`
-    );
-
-    // 替换内存中最新的 JS
-    combinedHtml = combinedHtml.replace(
-      /<script\s+src="sketch\.js"><\/script>/i,
-      `<script>${jsFile.content}</script>`
-    );
-
-    // 生成 Blob 渲染
-    const blob = new Blob([combinedHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    
-    // 垃圾回收，防止内存泄漏
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(url);
   };
 
   // 6. 在独立标签页打开预览
-  const handleOpenInNewTab = () => {
-    if (!previewUrl) {
-      alert('🪄 魔法画布还没有准备好，请先点击上方的“施放魔法”运行一次代码哦！');
-      return;
+  const handleOpenInNewTab = async () => {
+    if (files.length === 0) return;
+
+    const previewWindow = window.open('about:blank', '_blank');
+    setSaving(true);
+    try {
+      await saveFilesToServer(files);
+      const url = getProjectPreviewUrl();
+      setPreviewUrl(url);
+
+      if (previewWindow) {
+        previewWindow.location.href = url;
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (err) {
+      if (previewWindow) previewWindow.close();
+      alert(err.message);
+    } finally {
+      setSaving(false);
     }
-    // 直接在浏览器新标签页中打开临时的 Blob 预览页面
-    window.open(previewUrl, '_blank');
   };
 
   // 7. 跨 Iframe 安全捕获鼠标/手指移动坐标 ====================

@@ -11,7 +11,7 @@ const DEFAULT_TEMPLATES = {
 <html>
 <head>
   <meta charset="utf-8">
-  <script src="https://tigao123.com/teaching-p5js/libs/p5-1.11.13.min.js"></script>
+  <script src="/teaching-p5js/libs/p5-1.11.13.min.js"></script>
   <link rel="stylesheet" type="text/css" href="style.css">
 </head>
 <body>
