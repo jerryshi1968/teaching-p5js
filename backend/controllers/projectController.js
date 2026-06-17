@@ -118,7 +118,11 @@ exports.getProjectById = async (req, res, next) => {
       return res.status(404).json({ message: '项目不存在或无权限。' });
     }
 
-    res.json(project);
+    res.json({
+      id: project.id,
+      name: project.name,
+      canEdit: project.user_id === req.user.id
+    });
   } catch (err) {
     next(err);
   }

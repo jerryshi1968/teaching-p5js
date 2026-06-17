@@ -5,7 +5,7 @@ import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 
-const CodeEditor = ({ value, onChange, fileName }) => {
+const CodeEditor = ({ value, onChange, fileName, readOnly = false }) => {
   // 根据文件名动态匹配对应的 CodeMirror 6 语言插件
   const getLanguageExtension = (name) => {
     if (!name) return [];
@@ -35,6 +35,7 @@ const CodeEditor = ({ value, onChange, fileName }) => {
           height="100%"
           theme={vscodeDark}
           extensions={getLanguageExtension(fileName)}
+          editable={!readOnly}
           onChange={(val) => onChange && onChange(val)}
           placeholder="// 在这里编写您的代码..."
           basicSetup={{

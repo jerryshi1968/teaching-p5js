@@ -5,7 +5,11 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 router.use(authMiddleware);
 
-router.get('/project/:projectId', fileController.getProjectFiles); // 获取项目下所有文件（包含代码）
-router.put('/:id', fileController.saveFileContent); // 保存单个文件的代码
+router.get('/project/:projectId', fileController.getProjectFiles);
+router.post('/project/:projectId', fileController.createEntry);
+router.post('/project/:projectId/upload', fileController.uploadFile);
+router.patch('/:id/rename', fileController.renameEntry);
+router.delete('/:id', fileController.deleteEntry);
+router.put('/:id', fileController.saveFileContent);
 
 module.exports = router;

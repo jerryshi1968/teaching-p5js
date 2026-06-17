@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 const db = require('./config/db');
 
@@ -11,8 +12,9 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173', // 允许的前端源
   credentials: true // 允许携带 Cookie/Auth Header
 }));
-app.use(express.json()); // 解析 JSON 格式的请求体
-app.use(express.urlencoded({ extended: true })); // 解析 URL-encoded 请求体
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use('/teaching-p5js/projects', express.static(path.resolve(__dirname, 'storage/projects')));
 
 // 2. 健康检查路由：直接测试 Express 与 MySQL 8.4 的连接
 app.get('/api/health', async (req, res) => {
@@ -41,9 +43,10 @@ app.use('/api/files', require('./routes/files'));
 
 // 4. 全局错误捕获中间件
 app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
   console.error('Unhandled Server Error:', err.stack);
-  res.status(500).json({
-    message: 'An unexpected internal error occurred.',
+  res.status(statusCode).json({
+    message: err.message || 'An unexpected internal error occurred.',
     error: process.env.NODE_ENV === 'development' ? err.message : {}
   });
 });

@@ -37,12 +37,12 @@ exports.findOwnedById = async (projectId, userId) => {
 
 exports.findAccessibleById = async (projectId, user) => {
   if (canAccessAllProjects(user)) {
-    const [rows] = await db.query('SELECT id, name FROM projects WHERE id = ?', [projectId]);
+    const [rows] = await db.query('SELECT id, name, user_id FROM projects WHERE id = ?', [projectId]);
     return rows[0] || null;
   }
 
   const [rows] = await db.query(
-    'SELECT id, name FROM projects WHERE id = ? AND user_id = ?',
+    'SELECT id, name, user_id FROM projects WHERE id = ? AND user_id = ?',
     [projectId, user.id]
   );
   return rows[0] || null;
