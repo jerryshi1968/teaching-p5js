@@ -5,6 +5,8 @@ import { Folder, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Pa
 import { fetchMyProjects, copyProject } from '../services/api';
 import { useAppDialog } from '../hooks/useAppDialog';
 
+const DASHBOARD_SELECTED_STUDENT_KEY = 'teaching_dashboard_selected_student';
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const appDialog = useAppDialog();
@@ -14,7 +16,7 @@ const Dashboard = () => {
 
   // === 教师模式新增状态 ===
   const [students, setStudents] = useState([]); // 存放学生列表
-  const [selectedStudentId, setSelectedStudentId] = useState('me'); // 当前选中的学生 ID，默认为 'me' (自己)
+  const [selectedStudentId, setSelectedStudentId] = useState(() => sessionStorage.getItem(DASHBOARD_SELECTED_STUDENT_KEY) || 'me'); // 当前选中的学生 ID，默认为 'me' (自己)
 
   // 定义马卡龙卡通色系，让项目卡片五彩缤纷
   const cardStyles = [
@@ -38,6 +40,8 @@ const Dashboard = () => {
     
     return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
   };
+
+  const findSelectedStudent = () => students.find(s => String(s.id) === String(selectedStudentId));
 
   // 1. 初始化：获取用户信息
   useEffect(() => {
@@ -69,9 +73,18 @@ const Dashboard = () => {
     }
   }, []);
 
+  useEffect(() => {
+    sessionStorage.setItem(DASHBOARD_SELECTED_STUDENT_KEY, selectedStudentId);
+  }, [selectedStudentId]);
+
   // 2. 监听选中学生的变化，动态拉取作品列表
   useEffect(() => {
     if (!currentUser) return;
+
+    if (currentUser.role !== 'teacher' && selectedStudentId !== 'me') {
+      setSelectedStudentId('me');
+      return;
+    }
 
     setLoading(true);
     // 如果选中的是 'me'，传入 null（拉取自己的项目）；否则传入具体的学生 ID
@@ -194,7 +207,7 @@ const Dashboard = () => {
   
   const handleCopyProject = async (e, project) => {
     e.stopPropagation();
-    const studentName = students.find(s => s.id === selectedStudentId)?.username || '学生';
+    const studentName = findSelectedStudent()?.username || '学生';
     const confirmed = await appDialog.confirm({
       title: '复制到我的项目',
       message: `确定要把「${project.name}」复制成自己的项目吗？`,
@@ -228,6 +241,7 @@ const Dashboard = () => {
     })) {
       localStorage.removeItem('teaching_token');
       localStorage.removeItem('teaching_user');
+      sessionStorage.removeItem(DASHBOARD_SELECTED_STUDENT_KEY);
       navigate('/login');
     }
   };
@@ -303,12 +317,12 @@ const Dashboard = () => {
               {students.map((student) => (
                 <button
                   key={student.id}
-                  onClick={() => setSelectedStudentId(student.id)}
+                  onClick={() => setSelectedStudentId(String(student.id))}
                   className={`px-4 py-2 rounded-2xl text-xs font-black border-2 transition-all transform active:translate-y-0.5 ${
-                    selectedStudentId === student.id
+                  String(selectedStudentId) === String(student.id)
                       ? 'bg-indigo-400 border-indigo-500 text-white shadow-md'
                       : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                  }`}
+                }`}
                 >
                   👤 {student.username}
                 </button>
@@ -322,7 +336,7 @@ const Dashboard = () => {
           <div>
             <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
               <span>
-                {selectedStudentId === 'me' ? '🎨 我的创意工坊' : `📂 正在督导 [${students.find(s => s.id === selectedStudentId)?.username}] 的作品`}
+                {selectedStudentId === 'me' ? '🎨 我的创意工坊' : `📂 正在督导 [${findSelectedStudent()?.username || '学生'}] 的作品`}
               </span>
               <Sparkles className="w-6 h-6 text-yellow-400 animate-pulse" />
             </h1>
