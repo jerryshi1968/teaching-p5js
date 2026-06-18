@@ -24,21 +24,37 @@ export const fetchMyProjects = async (studentId = null) => {
 };
 
 export const copyProject = async (projectId) => {
-  const response = await fetch('/api/projects/copy', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeader()
-    },
-    body: JSON.stringify({ projectId })
-  });
-  const rawText = await response.text();
-  let data = null;
+  const requestCopyProject = async (url, body) => {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
+      },
+      body: JSON.stringify(body)
+    });
+    const rawText = await response.text();
+    let data = null;
 
-  try {
-    data = rawText ? JSON.parse(rawText) : null;
-  } catch (err) {
-    throw new Error('复制接口没有返回 JSON，请确认后端服务已重启，并且 /api 请求已代理到后端。');
+    try {
+      data = rawText ? JSON.parse(rawText) : null;
+    } catch (err) {
+      return { response, data: null, rawText, jsonError: err };
+    }
+
+    return { response, data, rawText, jsonError: null };
+  };
+
+  let result = await requestCopyProject(`/api/projects/${projectId}/copy`, {});
+
+  if (result.response.status === 404 && result.jsonError) {
+    result = await requestCopyProject('/api/projects/copy', { projectId });
+  }
+
+  const { response, data, jsonError } = result;
+
+  if (jsonError) {
+    throw new Error(`复制接口返回了非 JSON 响应（HTTP ${response.status}），请确认 /api/projects/${projectId}/copy 已代理到后端并且后端服务已重启。`);
   }
 
   if (response.status === 401 || response.status === 403) {
@@ -47,6 +63,6 @@ export const copyProject = async (projectId) => {
     window.location.href = '/login';
     return null;
   }
-  if (!response.ok) throw new Error(data?.message || '复制项目失败，请重试。');
+  if (!response.ok) throw new Error(data?.message || `复制项目失败（HTTP ${response.status}），请重试。`);
   return data;
 };
