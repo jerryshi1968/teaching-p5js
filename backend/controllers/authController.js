@@ -3,12 +3,32 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 require('dotenv').config();
 
+const isValidBirthday = (birthday) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return false;
+
+  const date = new Date(`${birthday}T00:00:00.000Z`);
+  return date.toISOString().slice(0, 10) === birthday;
+};
+
 exports.register = async (req, res, next) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, phone, classCode, gender, birthday } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ message: '用户名和密码不能为空。' });
+    if (!username || !password || !phone) {
+      return res.status(400).json({ message: '用户名、密码和手机号不能为空。' });
+    }
+
+    const cleanPhone = phone.trim();
+    if (!cleanPhone) {
+      return res.status(400).json({ message: '手机号不能为空。' });
+    }
+
+    if (gender && !['male', 'female'].includes(gender)) {
+      return res.status(400).json({ message: '性别选项不正确。' });
+    }
+
+    if (birthday && !isValidBirthday(birthday)) {
+      return res.status(400).json({ message: '生日格式不正确。' });
     }
 
     const userExists = await User.existsByUsername(username);
@@ -19,7 +39,14 @@ exports.register = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    await User.create({ username, passwordHash });
+    await User.create({
+      username,
+      passwordHash,
+      phone: cleanPhone,
+      classCode: classCode?.trim() || null,
+      gender: gender || null,
+      birthday: birthday || null
+    });
 
     res.status(201).json({ message: '注册成功！' });
   } catch (err) {

@@ -10,10 +10,10 @@ exports.existsByUsername = async (username) => {
   return rows.length > 0;
 };
 
-exports.create = async ({ username, passwordHash, role = 'student' }) => {
+exports.create = async ({ username, passwordHash, phone, classCode = null, gender = null, birthday = null, role = 'student' }) => {
   const [result] = await db.query(
-    'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
-    [username, passwordHash, role]
+    'INSERT INTO users (username, phone, class_code, gender, birthday, password_hash, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [username, phone, classCode, gender, birthday, passwordHash, role]
   );
   return result.insertId;
 };
