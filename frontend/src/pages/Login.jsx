@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, KeyRound, AlertCircle, Smile, Sparkles, Star, Rocket } from 'lucide-react';
+import { useAppDialog } from '../hooks/useAppDialog';
 
 const Login = () => {
   const navigate = useNavigate();
+  const appDialog = useAppDialog();
 
   // 1. 状态定义
   const [isLoginTab, setIsLoginTab] = useState(true); // true 为登录状态，false 为注册状态
@@ -71,7 +73,10 @@ const Login = () => {
         navigate('/dashboard');
       } else {
         // === 注册成功处理 ===
-        alert('🎉 注册成功！快用刚刚建好的账号登录，开启冒险吧！');
+        await appDialog.alert({
+          title: '注册成功',
+          message: '🎉 快用刚刚建好的账号登录，开启冒险吧！'
+        });
         setIsLoginTab(true); // 注册成功后自动切回登录页
         setPassword('');
         setConfirmPassword('');
@@ -84,6 +89,8 @@ const Login = () => {
   };
 
   return (
+    <>
+    {appDialog.dialog}
     <div className="min-h-screen bg-gradient-to-br from-sky-200 via-indigo-100 to-pink-100 flex items-center justify-center p-4 relative overflow-hidden font-sans">
       
       {/* 背景装饰性卡通泡泡/星星，增加画面丰富度 */}
@@ -240,6 +247,7 @@ const Login = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

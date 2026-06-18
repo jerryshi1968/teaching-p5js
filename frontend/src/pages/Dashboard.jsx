@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Folder, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy } from 'lucide-react';
 // 导入网络请求工具
 import { fetchMyProjects, copyProject } from '../services/api';
+import { useAppDialog } from '../hooks/useAppDialog';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const appDialog = useAppDialog();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
@@ -88,7 +90,13 @@ const Dashboard = () => {
 
   // 3. 创建新项目逻辑
   const handleCreateProject = async () => {
-    const projectName = prompt('🎨 想要给你的新作品起个什么酷炫的名字呢？', '我的奇妙创意');
+    const projectName = await appDialog.prompt({
+      title: '创建新作品',
+      message: '🎨 想要给你的新作品起个什么酷炫的名字呢？',
+      defaultValue: '我的奇妙创意',
+      placeholder: '请输入作品名称',
+      confirmText: '开始创作'
+    });
     if (!projectName || !projectName.trim()) return;
 
     try {
@@ -108,14 +116,23 @@ const Dashboard = () => {
       // 创建成功后，直接重定向至新项目编辑器
       navigate(`/editor/${data.id}`);
     } catch (err) {
-      alert(err.message);
+      await appDialog.alert({
+        title: '创建失败',
+        message: err.message
+      });
     }
   };
 
   // 4. 删除项目逻辑
   const handleDeleteProject = async (e, id) => {
     e.stopPropagation(); // 阻止卡片点击跳转到编辑页
-    if (!confirm('⚠️ 确定要跟这个心爱的小作品说再见吗？一旦删除就无法找回了哦！')) return;
+    const confirmed = await appDialog.confirm({
+      title: '删除作品',
+      message: '⚠️ 确定要跟这个心爱的小作品说再见吗？一旦删除就无法找回了哦！',
+      confirmText: '删除作品',
+      tone: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       const token = localStorage.getItem('teaching_token');
@@ -132,14 +149,23 @@ const Dashboard = () => {
       // 更新前端状态列表
       setProjects(projects.filter(p => p.id !== id));
     } catch (err) {
-      alert(err.message);
+      await appDialog.alert({
+        title: '删除失败',
+        message: err.message
+      });
     }
   };
 
   // 5. 修改项目名称逻辑
   const handleRenameProject = async (e, id, currentName) => {
     e.stopPropagation(); // 阻止卡片点击跳转到编辑器
-    const newName = prompt('🎨 想要给你的作品换个什么酷炫的新名字呢？', currentName);
+    const newName = await appDialog.prompt({
+      title: '修改作品名称',
+      message: '🎨 想要给你的作品换个什么酷炫的新名字呢？',
+      defaultValue: currentName,
+      placeholder: '请输入新的作品名称',
+      confirmText: '保存名称'
+    });
     if (!newName || !newName.trim() || newName === currentName) return;
 
     try {
@@ -159,14 +185,23 @@ const Dashboard = () => {
       // 更新 React 本地状态列表，使界面立即呈现新名字
       setProjects(projects.map(p => p.id === id ? { ...p, name: newName } : p));
     } catch (err) {
-      alert(err.message);
+      await appDialog.alert({
+        title: '重命名失败',
+        message: err.message
+      });
     }
   };
   
   const handleCopyProject = async (e, project) => {
     e.stopPropagation();
     const studentName = students.find(s => s.id === selectedStudentId)?.username || '学生';
-    if (!confirm(`确定要把「${project.name}」复制成自己的项目吗？\n复制后的名称为：${project.name} - 来自${studentName}`)) return;
+    const confirmed = await appDialog.confirm({
+      title: '复制到我的项目',
+      message: `确定要把「${project.name}」复制成自己的项目吗？`,
+      highlight: `复制后的名称为：${project.name} - 来自${studentName}`,
+      confirmText: '复制项目'
+    });
+    if (!confirmed) return;
 
     try {
       setLoading(true);
@@ -175,15 +210,22 @@ const Dashboard = () => {
       if (myProjects) setProjects(myProjects);
       setSelectedStudentId('me');
     } catch (err) {
-      alert(err.message);
+      await appDialog.alert({
+        title: '复制失败',
+        message: err.message
+      });
     } finally {
       setLoading(false);
     }
   };
 
   // 6. 退出登录逻辑
-  const handleLogout = () => {
-    if (confirm('🚪 确定要离开我们的编程乐园基地吗？今天学得很棒，下次再见哦！')) {
+  const handleLogout = async () => {
+    if (await appDialog.confirm({
+      title: '离开基地',
+      message: '🚪 确定要离开我们的编程乐园基地吗？今天学得很棒，下次再见哦！',
+      confirmText: '离开基地'
+    })) {
       localStorage.removeItem('teaching_token');
       localStorage.removeItem('teaching_user');
       navigate('/login');
@@ -191,6 +233,8 @@ const Dashboard = () => {
   };
 
   return (
+    <>
+    {appDialog.dialog}
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-indigo-50 to-pink-100 text-slate-800 flex flex-col font-sans">
       
       {/* 顶部全局导航栏 */}
@@ -405,6 +449,7 @@ const Dashboard = () => {
         )}
       </main>
     </div>
+    </>
   );
 };
 

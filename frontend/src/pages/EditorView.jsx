@@ -4,6 +4,7 @@ import Split from 'react-split';
 import { ChevronLeft, ExternalLink, Play, Save, Sparkles, Wand2 } from 'lucide-react';
 import CodeEditor from '../components/Workspace/CodeEditor';
 import FileTree from '../components/Workspace/FileTree';
+import { useAppDialog } from '../hooks/useAppDialog';
 
 const TEXT_EXTENSIONS = ['.html', '.htm', '.css', '.js', '.txt'];
 
@@ -29,6 +30,7 @@ const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
 const EditorView = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const appDialog = useAppDialog();
   const iframeRef = useRef(null);
 
   const [files, setFiles] = useState([]);
@@ -105,7 +107,10 @@ const EditorView = () => {
       try {
         await loadProjectFiles();
       } catch (err) {
-        alert(err.message);
+        await appDialog.alert({
+          title: '加载失败',
+          message: err.message
+        });
         navigate('/dashboard');
       } finally {
         if (isMounted) setLoading(false);
@@ -149,9 +154,15 @@ const EditorView = () => {
     setSaving(true);
     try {
       await saveFilesToServer([activeFile]);
-      alert(`"${activeFile.name}" 已保存。`);
+      await appDialog.alert({
+        title: '保存成功',
+        message: `"${activeFile.name}" 已保存。`
+      });
     } catch (err) {
-      alert(err.message);
+      await appDialog.alert({
+        title: '保存失败',
+        message: err.message
+      });
     } finally {
       setSaving(false);
     }
@@ -163,7 +174,10 @@ const EditorView = () => {
       await saveFilesToServer(files);
       setPreviewUrl(getProjectPreviewUrl());
     } catch (err) {
-      alert(err.message);
+      await appDialog.alert({
+        title: '运行失败',
+        message: err.message
+      });
     } finally {
       setSaving(false);
     }
@@ -184,7 +198,10 @@ const EditorView = () => {
       }
     } catch (err) {
       if (previewWindow) previewWindow.close();
-      alert(err.message);
+      await appDialog.alert({
+        title: '打开失败',
+        message: err.message
+      });
     } finally {
       setSaving(false);
     }
@@ -193,12 +210,21 @@ const EditorView = () => {
   const handleCreateFile = async () => {
     if (!canEdit) return;
 
-    const name = prompt('请输入新文本文件名（支持 .html、.css、.js、.txt）：', 'new-file.js');
+    const name = await appDialog.prompt({
+      title: '新建文本文件',
+      message: '请输入新文本文件名（支持 .html、.css、.js、.txt）：',
+      defaultValue: 'new-file.js',
+      placeholder: 'new-file.js',
+      confirmText: '创建文件'
+    });
     if (!name) return;
 
     const lowerName = name.toLowerCase();
     if (!TEXT_EXTENSIONS.some((ext) => lowerName.endsWith(ext))) {
-      alert('只能创建 .html、.css、.js、.txt 文本文件。');
+      await appDialog.alert({
+        title: '文件类型不支持',
+        message: '只能创建 .html、.css、.js、.txt 文本文件。'
+      });
       return;
     }
 
@@ -215,14 +241,23 @@ const EditorView = () => {
       await loadProjectFiles();
       setActiveFileId(created.id);
     } catch (err) {
-      alert(err.message);
+      await appDialog.alert({
+        title: '创建失败',
+        message: err.message
+      });
     }
   };
 
   const handleCreateFolder = async () => {
     if (!canEdit) return;
 
-    const name = prompt('请输入新文件夹名：', 'assets');
+    const name = await appDialog.prompt({
+      title: '新建文件夹',
+      message: '请输入新文件夹名：',
+      defaultValue: 'assets',
+      placeholder: 'assets',
+      confirmText: '创建文件夹'
+    });
     if (!name) return;
 
     try {
@@ -237,7 +272,10 @@ const EditorView = () => {
       await loadProjectFiles();
       setActiveFileId(created.id);
     } catch (err) {
-      alert(err.message);
+      await appDialog.alert({
+        title: '创建失败',
+        message: err.message
+      });
     }
   };
 
@@ -264,7 +302,10 @@ const EditorView = () => {
       await loadProjectFiles();
       if (lastUploaded) setActiveFileId(lastUploaded.id);
     } catch (err) {
-      alert(err.message);
+      await appDialog.alert({
+        title: '上传失败',
+        message: err.message
+      });
     } finally {
       setSaving(false);
     }
@@ -273,7 +314,13 @@ const EditorView = () => {
   const handleRename = async (file) => {
     if (!canEdit || file.path === './index.html') return;
 
-    const name = prompt('请输入新的名称：', file.name);
+    const name = await appDialog.prompt({
+      title: '重命名',
+      message: '请输入新的名称：',
+      defaultValue: file.name,
+      placeholder: file.name,
+      confirmText: '保存名称'
+    });
     if (!name || name === file.name) return;
 
     try {
@@ -283,21 +330,32 @@ const EditorView = () => {
       });
       await loadProjectFiles();
     } catch (err) {
-      alert(err.message);
+      await appDialog.alert({
+        title: '重命名失败',
+        message: err.message
+      });
     }
   };
 
   const handleDelete = async (file) => {
     if (!canEdit || file.path === './index.html') return;
 
-    const ok = confirm(`确定删除 "${file.name}" 吗？${file.isDirectory ? ' 文件夹内的内容也会一起删除。' : ''}`);
+    const ok = await appDialog.confirm({
+      title: '删除文件',
+      message: `确定删除 "${file.name}" 吗？${file.isDirectory ? ' 文件夹内的内容也会一起删除。' : ''}`,
+      confirmText: '删除',
+      tone: 'danger'
+    });
     if (!ok) return;
 
     try {
       await requestJson(`/api/files/${file.id}`, { method: 'DELETE' });
       await loadProjectFiles();
     } catch (err) {
-      alert(err.message);
+      await appDialog.alert({
+        title: '删除失败',
+        message: err.message
+      });
     }
   };
 
@@ -362,6 +420,8 @@ const EditorView = () => {
 
   if (loading) {
     return (
+      <>
+      {appDialog.dialog}
       <div className="h-screen w-screen bg-gradient-to-br from-sky-100 via-indigo-50 to-pink-100 flex flex-col items-center justify-center text-slate-600 gap-4">
         <div className="relative flex items-center justify-center">
           <div className="w-16 h-16 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin" />
@@ -369,10 +429,13 @@ const EditorView = () => {
         </div>
         <p className="font-black text-base text-indigo-950">正在为你拼装魔法画板，代码正在飞速赶来... 🚀</p>
       </div>
+      </>
     );
   }
 
   return (
+    <>
+    {appDialog.dialog}
     <div className="h-screen w-screen bg-slate-50 text-slate-800 flex flex-col overflow-hidden font-sans">
       <header className="h-16 bg-white border-b-4 border-slate-100 flex items-center justify-between px-5 select-none shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
         <div className="flex items-center space-x-4">
@@ -499,6 +562,7 @@ const EditorView = () => {
         </Split>
       </div>
     </div>
+    </>
   );
 };
 
