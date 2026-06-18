@@ -3,5 +3,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: '/teaching-p5js/'
+  base: '/teaching-p5js/',
+  server: {
+    proxy: {
+      '/api': 'http://localhost:5000'
+    }
+  }
 });

@@ -48,6 +48,28 @@ exports.findAccessibleById = async (projectId, user) => {
   return rows[0] || null;
 };
 
+exports.findAccessibleWithOwnerById = async (projectId, user) => {
+  if (canAccessAllProjects(user)) {
+    const [rows] = await db.query(
+      `SELECT p.id, p.name, p.user_id, u.username AS owner_name
+       FROM projects p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.id = ?`,
+      [projectId]
+    );
+    return rows[0] || null;
+  }
+
+  const [rows] = await db.query(
+    `SELECT p.id, p.name, p.user_id, u.username AS owner_name
+     FROM projects p
+     JOIN users u ON p.user_id = u.id
+     WHERE p.id = ? AND p.user_id = ?`,
+    [projectId, user.id]
+  );
+  return rows[0] || null;
+};
+
 exports.deleteById = async (projectId) => {
   const [result] = await db.query('DELETE FROM projects WHERE id = ?', [projectId]);
   return result.affectedRows;

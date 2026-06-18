@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Folder, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil } from 'lucide-react';
+import { Folder, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy } from 'lucide-react';
 // 导入网络请求工具
-import { fetchMyProjects } from '../services/api';
+import { fetchMyProjects, copyProject } from '../services/api';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -163,6 +163,24 @@ const Dashboard = () => {
     }
   };
   
+  const handleCopyProject = async (e, project) => {
+    e.stopPropagation();
+    const studentName = students.find(s => s.id === selectedStudentId)?.username || '学生';
+    if (!confirm(`确定要把「${project.name}」复制成自己的项目吗？\n复制后的名称为：${project.name} - 来自${studentName}`)) return;
+
+    try {
+      setLoading(true);
+      await copyProject(project.id);
+      const myProjects = await fetchMyProjects();
+      if (myProjects) setProjects(myProjects);
+      setSelectedStudentId('me');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 6. 退出登录逻辑
   const handleLogout = () => {
     if (confirm('🚪 确定要离开我们的编程乐园基地吗？今天学得很棒，下次再见哦！')) {
@@ -332,6 +350,18 @@ const Dashboard = () => {
                         ✨ {project.name}
                       </h3>
                       
+                      {selectedStudentId !== 'me' && (
+                        <div className="flex items-center space-x-1 shrink-0">
+                          <button
+                            onClick={(e) => handleCopyProject(e, project)}
+                            className="text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-xl transition duration-150"
+                            title="复制成我的项目"
+                          >
+                            <Copy className="w-4.5 h-4.5" />
+                          </button>
+                        </div>
+                      )}
+
                       {/* 操作按钮区（仅在看自己的项目时显示，防止老师误修改或误删学生作品） */}
                       {selectedStudentId === 'me' && (
                         <div className="flex items-center space-x-1 shrink-0">

@@ -91,6 +91,56 @@ exports.createProject = async (req, res, next) => {
   }
 };
 
+exports.copyProject = async (req, res, next) => {
+  const connection = await Project.getConnection();
+  let newProjectFolder = null;
+
+  try {
+    await connection.beginTransaction();
+
+    const sourceProjectId = req.body.projectId || req.params.id;
+    const sourceProject = await Project.findAccessibleWithOwnerById(sourceProjectId, req.user);
+
+    if (!sourceProject) {
+      await connection.rollback();
+      return res.status(404).json({ message: '椤圭洰涓嶅瓨鍦ㄦ垨鏃犳潈闄愩€?' });
+    }
+
+    const projectId = crypto.randomUUID();
+    const projectName = `${sourceProject.name} - 来自${sourceProject.owner_name}`;
+    const sourceProjectFolder = path.join(PROJECTS_BASE_DIR, sourceProject.id);
+    newProjectFolder = path.join(PROJECTS_BASE_DIR, projectId);
+
+    await Project.createWithConnection(connection, {
+      id: projectId,
+      userId: req.user.id,
+      name: projectName
+    });
+
+    const files = await File.findByProjectId(sourceProject.id);
+    for (const file of files) {
+      await File.createWithConnection(connection, {
+        projectId,
+        name: file.name,
+        path: file.path
+      });
+    }
+
+    await fs.cp(sourceProjectFolder, newProjectFolder, { recursive: true });
+
+    await connection.commit();
+    res.status(201).json({ id: projectId, name: projectName, message: '项目复制成功。' });
+  } catch (err) {
+    await connection.rollback();
+    if (newProjectFolder) {
+      await fs.rm(newProjectFolder, { recursive: true, force: true }).catch(() => {});
+    }
+    next(err);
+  } finally {
+    connection.release();
+  }
+};
+
 exports.deleteProject = async (req, res, next) => {
   try {
     const projectId = req.params.id;
