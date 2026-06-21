@@ -1,7 +1,43 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/userModel');
+const Verification = require('../models/verificationModel');
+const smsService = require('../services/smsService');
 require('dotenv').config();
+
+const CAPTCHA_EXPIRES_MINUTES = 5;
+const CAPTCHA_TOKEN_EXPIRES_MINUTES = 2;
+const SMS_PHONE_LIMIT_PER_HOUR = 5;
+const SMS_IP_LIMIT_PER_HOUR = 20;
+const SMS_PURPOSES = ['register', 'update_phone'];
+
+const isValidPhone = (phone) => /^1[3-9]\d{9}$/.test(phone);
+
+const addMinutes = (minutes) => new Date(Date.now() + minutes * 60 * 1000);
+
+const oneHourAgo = () => new Date(Date.now() - 60 * 60 * 1000);
+
+const hashValue = (value) => crypto
+  .createHash('sha256')
+  .update(`${value}:${process.env.JWT_SECRET || 'teaching_p5js_secret_key_2026'}`)
+  .digest('hex');
+
+const normalizePurpose = (purpose) => SMS_PURPOSES.includes(purpose) ? purpose : null;
+
+const getRequestIp = (req) => req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+
+const verifySmsCode = async ({ phone, code, sourceIp }) => {
+  if (!code || !/^\d{4,8}$/.test(String(code).trim())) {
+    return false;
+  }
+
+  return smsService.checkVerificationCode({
+    phone,
+    verifyCode: String(code).trim(),
+    sourceIp
+  });
+};
 
 const isValidBirthday = (birthday) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return false;
@@ -30,17 +66,133 @@ const formatUserProfile = (user) => ({
   role: user.role
 });
 
+exports.createCaptchaChallenge = async (req, res, next) => {
+  try {
+    const challengeId = crypto.randomUUID();
+    const targetX = crypto.randomInt(64, 236);
+
+    await Verification.createCaptchaChallenge({
+      challengeId,
+      targetX,
+      expiresAt: addMinutes(CAPTCHA_EXPIRES_MINUTES)
+    });
+
+    res.json({
+      challengeId,
+      trackWidth: 300,
+      pieceWidth: 44,
+      targetHint: targetX
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.verifyCaptchaChallenge = async (req, res, next) => {
+  try {
+    const { challengeId, x } = req.body;
+    const challenge = await Verification.findCaptchaChallenge(challengeId);
+
+    if (!challenge || challenge.verified_at || challenge.used_at || new Date(challenge.expires_at).getTime() <= Date.now()) {
+      return res.status(400).json({ message: '滑块验证已失效，请重新验证。' });
+    }
+
+    const submittedX = Number(x);
+    if (!Number.isFinite(submittedX) || Math.abs(submittedX - Number(challenge.target_x)) > 6) {
+      return res.status(400).json({ message: '滑块位置不正确，请再试一次。' });
+    }
+
+    const captchaToken = crypto.randomUUID();
+    const affectedRows = await Verification.markCaptchaChallengeVerified({
+      challengeId,
+      tokenHash: hashValue(captchaToken),
+      tokenExpiresAt: addMinutes(CAPTCHA_TOKEN_EXPIRES_MINUTES)
+    });
+
+    if (affectedRows === 0) {
+      return res.status(400).json({ message: '滑块验证已失效，请重新验证。' });
+    }
+
+    res.json({ captchaToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.sendSmsCode = async (req, res, next) => {
+  try {
+    const { phone, captchaToken, purpose = 'register' } = req.body;
+    const cleanPhone = phone?.trim();
+    const cleanPurpose = normalizePurpose(purpose);
+    const ipAddress = getRequestIp(req);
+
+    if (!cleanPurpose) {
+      return res.status(400).json({ message: '短信验证码场景不正确。' });
+    }
+
+    if (cleanPurpose === 'update_phone' && !req.user) {
+      return res.status(401).json({ message: '请先登录后再修改手机号。' });
+    }
+
+    if (!cleanPhone || !isValidPhone(cleanPhone)) {
+      return res.status(400).json({ message: '请输入正确的手机号码。' });
+    }
+
+    if (!captchaToken) {
+      return res.status(400).json({ message: '请先完成滑块验证。' });
+    }
+
+    const captchaAffectedRows = await Verification.consumeCaptchaToken(hashValue(captchaToken));
+    if (captchaAffectedRows === 0) {
+      return res.status(400).json({ message: '滑块验证已过期，请重新验证。' });
+    }
+
+    const since = oneHourAgo();
+    const phoneCount = await Verification.countSmsByPhone({ phone: cleanPhone, since });
+    if (phoneCount >= SMS_PHONE_LIMIT_PER_HOUR) {
+      return res.status(429).json({ message: '该手机号验证码发送过于频繁，请 1 小时后再试。' });
+    }
+
+    const ipCount = await Verification.countSmsByIp({ ipAddress, since });
+    if (ipCount >= SMS_IP_LIMIT_PER_HOUR) {
+      return res.status(429).json({ message: '当前网络验证码发送过于频繁，请稍后再试。' });
+    }
+
+    try {
+      await smsService.sendVerificationCode({ phone: cleanPhone, sourceIp: ipAddress });
+    } catch (smsErr) {
+      console.error('SMS verification code send failed:', smsErr.message);
+      return res.status(502).json({ message: 'SMS send failed: ' + smsErr.message });
+    }
+
+    await Verification.logSmsSend({
+      phone: cleanPhone,
+      ipAddress,
+      purpose: cleanPurpose
+    });
+
+    res.json({ message: '验证码已发送，请注意查收。' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.register = async (req, res, next) => {
   try {
-    const { username, password, phone, classCode, gender, birthday } = req.body;
+    const { username, password, phone, classCode, gender, birthday, smsCode } = req.body;
 
     if (!username || !password || !phone) {
       return res.status(400).json({ message: '用户名、密码和手机号不能为空。' });
     }
 
     const cleanPhone = phone.trim();
+    const ipAddress = getRequestIp(req);
     if (!cleanPhone) {
       return res.status(400).json({ message: '手机号不能为空。' });
+    }
+
+    if (!isValidPhone(cleanPhone)) {
+      return res.status(400).json({ message: '请输入正确的手机号码。' });
     }
 
     if (gender && !['male', 'female'].includes(gender)) {
@@ -54,6 +206,16 @@ exports.register = async (req, res, next) => {
     const userExists = await User.existsByUsername(username);
     if (userExists) {
       return res.status(409).json({ message: '该用户名已被占用，请尝试其他登录名。' });
+    }
+
+    const smsCodeValid = await verifySmsCode({
+      phone: cleanPhone,
+      code: smsCode,
+      sourceIp: ipAddress
+    });
+
+    if (!smsCodeValid) {
+      return res.status(400).json({ message: '手机验证码不正确或已过期。' });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -89,7 +251,7 @@ exports.getMe = async (req, res, next) => {
 
 exports.updateMe = async (req, res, next) => {
   try {
-    const { username, phone, classCode, gender, birthday } = req.body;
+    const { username, phone, classCode, gender, birthday, smsCode } = req.body;
 
     if (!username || !phone) {
       return res.status(400).json({ message: '用户名和手机号不能为空。' });
@@ -97,6 +259,7 @@ exports.updateMe = async (req, res, next) => {
 
     const cleanUsername = username.trim();
     const cleanPhone = phone.trim();
+    const ipAddress = getRequestIp(req);
 
     if (!cleanUsername) {
       return res.status(400).json({ message: '用户名不能为空。' });
@@ -105,6 +268,17 @@ exports.updateMe = async (req, res, next) => {
     if (!cleanPhone) {
       return res.status(400).json({ message: '手机号不能为空。' });
     }
+
+    if (!isValidPhone(cleanPhone)) {
+      return res.status(400).json({ message: '请输入正确的手机号码。' });
+    }
+
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const phoneChanged = (currentUser.phone || '') !== cleanPhone;
 
     if (gender && !['male', 'female'].includes(gender)) {
       return res.status(400).json({ message: '性别选项不正确。' });
@@ -117,6 +291,18 @@ exports.updateMe = async (req, res, next) => {
     const userExists = await User.existsByUsernameExceptId(cleanUsername, req.user.id);
     if (userExists) {
       return res.status(409).json({ message: '该用户名已被占用，请尝试其他登录名。' });
+    }
+
+    if (phoneChanged) {
+      const smsCodeValid = await verifySmsCode({
+        phone: cleanPhone,
+        code: smsCode,
+        sourceIp: ipAddress
+      });
+
+      if (!smsCodeValid) {
+        return res.status(400).json({ message: '手机验证码不正确或已过期。' });
+      }
     }
 
     const affectedRows = await User.updateProfile({

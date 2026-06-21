@@ -6,6 +6,7 @@ const db = require('./config/db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+app.set('trust proxy', 1);
 
 // 1. 全局中间件配置
 app.use(cors({

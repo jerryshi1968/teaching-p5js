@@ -123,6 +123,19 @@ DB_PASSWORD=your_mysql_password
 DB_NAME=teaching_p5js
 
 JWT_SECRET=replace_with_a_strong_secret
+
+ALIYUN_ACCESS_KEY_ID=your_aliyun_access_key_id
+ALIYUN_ACCESS_KEY_SECRET=your_aliyun_access_key_secret
+ALIYUN_SMS_ENDPOINT=dypnsapi.aliyuncs.com
+ALIYUN_SMS_REGION_ID=cn-shanghai
+ALIYUN_SMS_SCHEME_NAME=your_scheme_name
+ALIYUN_SMS_COUNTRY_CODE=86
+ALIYUN_SMS_SIGN_NAME=your_sms_sign_name
+ALIYUN_SMS_TEMPLATE_CODE=your_sms_template_code
+ALIYUN_SMS_TEMPLATE_PARAM_NAME=code
+ALIYUN_SMS_TEMPLATE_CODE_PLACEHOLDER=##code##
+ALIYUN_SMS_TEMPLATE_MINUTE_PARAM_NAME=min
+ALIYUN_SMS_TEMPLATE_MINUTE_VALUE=5
 ```
 
 ### 4. 初始化数据库
@@ -167,6 +180,30 @@ CREATE TABLE files (
   CONSTRAINT fk_files_project
     FOREIGN KEY (project_id) REFERENCES projects(id)
     ON DELETE CASCADE
+);
+
+CREATE TABLE captcha_challenges (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  challenge_id CHAR(36) NOT NULL UNIQUE,
+  target_x INT NOT NULL,
+  expires_at DATETIME NOT NULL,
+  verified_at DATETIME NULL,
+  used_at DATETIME NULL,
+  captcha_token_hash CHAR(64) NULL,
+  token_expires_at DATETIME NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_captcha_token_hash (captcha_token_hash),
+  INDEX idx_captcha_expires_at (expires_at)
+);
+
+CREATE TABLE sms_send_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  phone VARCHAR(20) NOT NULL,
+  ip_address VARCHAR(64) NOT NULL,
+  purpose ENUM('register', 'update_phone') NOT NULL,
+  sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_sms_phone_sent_at (phone, sent_at),
+  INDEX idx_sms_ip_sent_at (ip_address, sent_at)
 );
 ```
 
@@ -231,29 +268,35 @@ npm run preview
 
 ### 认证
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| `POST` | `/api/auth/register` | 注册学生账号 |
-| `POST` | `/api/auth/login` | 登录并获取 JWT |
-| `GET` | `/api/auth/students` | 获取学生列表，教师/管理员可用 |
+
+| 方法     | 路径                   | 说明              |
+| ------ | -------------------- | --------------- |
+| `POST` | `/api/auth/register` | 注册学生账号          |
+| `POST` | `/api/auth/login`    | 登录并获取 JWT       |
+| `GET`  | `/api/auth/students` | 获取学生列表，教师/管理员可用 |
+
 
 ### 项目
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| `GET` | `/api/projects` | 获取当前用户项目列表 |
-| `GET` | `/api/projects?studentId=<id>` | 教师/管理员查看指定学生项目 |
-| `POST` | `/api/projects` | 创建项目并生成默认文件 |
-| `GET` | `/api/projects/:id` | 获取单个项目信息 |
-| `PUT` | `/api/projects/:id` | 修改项目名称 |
-| `DELETE` | `/api/projects/:id` | 删除项目及对应物理文件 |
+
+| 方法       | 路径                             | 说明             |
+| -------- | ------------------------------ | -------------- |
+| `GET`    | `/api/projects`                | 获取当前用户项目列表     |
+| `GET`    | `/api/projects?studentId=<id>` | 教师/管理员查看指定学生项目 |
+| `POST`   | `/api/projects`                | 创建项目并生成默认文件    |
+| `GET`    | `/api/projects/:id`            | 获取单个项目信息       |
+| `PUT`    | `/api/projects/:id`            | 修改项目名称         |
+| `DELETE` | `/api/projects/:id`            | 删除项目及对应物理文件    |
+
 
 ### 文件
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
+
+| 方法    | 路径                              | 说明           |
+| ----- | ------------------------------- | ------------ |
 | `GET` | `/api/files/project/:projectId` | 获取项目下所有文件及内容 |
-| `PUT` | `/api/files/:id` | 保存单个文件内容 |
+| `PUT` | `/api/files/:id`                | 保存单个文件内容     |
+
 
 除注册、登录与健康检查外，业务接口需要在请求头中携带：
 

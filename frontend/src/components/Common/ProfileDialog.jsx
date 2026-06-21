@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarDays, Eye, EyeOff, KeyRound, Lock, Phone, Save, User, Users, X } from 'lucide-react';
+import SmsCodeField from './SmsCodeField';
 
 const currentYear = new Date().getFullYear();
 const birthdayYears = Array.from({ length: 100 }, (_, index) => currentYear - index);
@@ -33,6 +34,8 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
   const [passwordErrorMsg, setPasswordErrorMsg] = useState('');
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [originalPhone, setOriginalPhone] = useState('');
+  const [smsCode, setSmsCode] = useState('');
   const [passwordForm, setPasswordForm] = useState({
     oldPassword: '',
     newPassword: '',
@@ -76,6 +79,8 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
             birthdayMonth: birthday.month,
             birthdayDay: birthday.day
           });
+          setOriginalPhone(data.phone || '');
+          setSmsCode('');
         }
       } catch (err) {
         if (isMounted) setErrorMsg(err.message);
@@ -98,6 +103,8 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
     setPasswordErrorMsg('');
     setShowOldPassword(false);
     setShowNewPassword(false);
+    setOriginalPhone('');
+    setSmsCode('');
     setPasswordForm({
       oldPassword: '',
       newPassword: '',
@@ -108,6 +115,10 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
   if (!open) return null;
 
   const updateField = (field, value) => {
+    if (field === 'phone') {
+      setSmsCode('');
+    }
+
     setForm((previousForm) => ({ ...previousForm, [field]: value }));
   };
 
@@ -191,6 +202,11 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
       return;
     }
 
+    if (form.phone.trim() !== originalPhone && !smsCode.trim()) {
+      setErrorMsg('请填写手机验证码。');
+      return;
+    }
+
     const birthday = buildBirthday(form.birthdayYear, form.birthdayMonth, form.birthdayDay);
     if (birthday === 'invalid') {
       setErrorMsg('生日如果要填写，请把年、月、日都选完整哦。');
@@ -215,6 +231,7 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
         body: JSON.stringify({
           username: form.username.trim(),
           phone: form.phone.trim(),
+          smsCode: smsCode.trim(),
           classCode: form.classCode.trim() || null,
           gender: form.gender || null,
           birthday
@@ -298,6 +315,21 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
                 />
               </div>
             </div>
+
+            {form.phone.trim() !== originalPhone && (
+              <div>
+                <label className="mb-1.5 ml-1 block text-xs font-black text-slate-500">手机验证码</label>
+                <SmsCodeField
+                  phone={form.phone}
+                  purpose="update_phone"
+                  value={smsCode}
+                  onChange={setSmsCode}
+                  sendEndpoint="/api/auth/me/sms-code"
+                  authRequired
+                  disabled={saving}
+                />
+              </div>
+            )}
 
             <div>
               <label className="mb-1.5 ml-1 block text-xs font-black text-slate-500">班级码（可选）</label>

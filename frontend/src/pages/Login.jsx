@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, KeyRound, AlertCircle, Smile, Sparkles, Star, Rocket, Phone, Users, CalendarDays } from 'lucide-react';
 import { useAppDialog } from '../hooks/useAppDialog';
+import SmsCodeField from '../components/Common/SmsCodeField';
 
 const currentYear = new Date().getFullYear();
 const birthdayYears = Array.from({ length: 30 }, (_, index) => currentYear - index);
@@ -23,6 +24,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState(''); // 仅注册时使用
   const [phone, setPhone] = useState('');
+  const [smsCode, setSmsCode] = useState('');
   const [classCode, setClassCode] = useState('');
   const [gender, setGender] = useState('');
   const [birthdayYear, setBirthdayYear] = useState('');
@@ -40,6 +42,7 @@ const Login = () => {
     setPassword('');
     setConfirmPassword('');
     setPhone('');
+    setSmsCode('');
     setClassCode('');
     setGender('');
     setBirthdayYear('');
@@ -69,6 +72,11 @@ const Login = () => {
       return;
     }
 
+    if (!isLoginTab && !smsCode.trim()) {
+      setErrorMsg('请填写手机验证码。');
+      return;
+    }
+
     const hasBirthdayPart = birthdayYear || birthdayMonth || birthdayDay;
     if (!isLoginTab && hasBirthdayPart && (!birthdayYear || !birthdayMonth || !birthdayDay)) {
       setErrorMsg('生日如果要填写，请把年、月、日都选完整哦。');
@@ -93,6 +101,7 @@ const Login = () => {
             username,
             password,
             phone: phone.trim(),
+            smsCode: smsCode.trim(),
             classCode: classCode.trim() || null,
             gender: gender || null,
             birthday
@@ -132,6 +141,7 @@ const Login = () => {
         setPassword('');
         setConfirmPassword('');
         setPhone('');
+        setSmsCode('');
         setClassCode('');
         setGender('');
         setBirthdayYear('');
@@ -282,6 +292,23 @@ const Login = () => {
                 </div>
               </div>
             )}
+
+            {!isLoginTab && (
+              <div className="transition-all duration-300">
+                <label className="block text-xs font-black text-slate-500 mb-1.5 ml-1">
+                  手机验证码
+                </label>
+                <SmsCodeField
+                  phone={phone}
+                  purpose="register"
+                  value={smsCode}
+                  onChange={setSmsCode}
+                  sendEndpoint="/api/auth/sms-code"
+                  disabled={loading}
+                />
+              </div>
+            )}
+
 
             {/* 班级码（仅注册时显示） */}
             {!isLoginTab && (
