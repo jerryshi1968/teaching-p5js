@@ -23,8 +23,16 @@ export const fetchMyProjects = async (studentId = null) => {
   return response.json();
 };
 
-export const fetchAdminUsers = async (page = 1, pageSize = 10) => {
-  const response = await fetch(`/api/admin/users?page=${page}&pageSize=${pageSize}`, {
+export const fetchAdminUsers = async (page = 1, pageSize = 10, username = '') => {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize)
+  });
+  if (username.trim()) {
+    params.set('username', username.trim());
+  }
+
+  const response = await fetch(`/api/admin/users?${params.toString()}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -36,6 +44,23 @@ export const fetchAdminUsers = async (page = 1, pageSize = 10) => {
     throw new Error(data?.message || '无权访问管理页面。');
   }
   if (!response.ok) throw new Error(data?.message || `获取用户列表失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const updateAdminUserRole = async (userId, role) => {
+  const response = await fetch(`/api/admin/users/${userId}/role`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify({ role })
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权修改用户角色。');
+  }
+  if (!response.ok) throw new Error(data?.message || `修改用户角色失败（HTTP ${response.status}），请重试。`);
   return data;
 };
 

@@ -56,15 +56,29 @@ exports.listStudents = async () => {
   return rows;
 };
 
-exports.listUsersPaginated = async ({ limit, offset }) => {
+exports.listUsersPaginated = async ({ limit, offset, username = '' }) => {
+  const keyword = username.trim();
+  const whereClause = keyword ? ' WHERE username LIKE ?' : '';
+  const params = keyword ? [`%${keyword}%`, limit, offset] : [limit, offset];
   const [rows] = await db.query(
-    'SELECT id, username, phone, gender, DATE_FORMAT(birthday, "%Y-%m-%d") AS birthday, role, created_at FROM users ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?',
-    [limit, offset]
+    `SELECT id, username, phone, gender, DATE_FORMAT(birthday, "%Y-%m-%d") AS birthday, role, created_at FROM users${whereClause} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+    params
   );
   return rows;
 };
 
-exports.countUsers = async () => {
-  const [rows] = await db.query('SELECT COUNT(*) AS total FROM users');
+exports.countUsers = async ({ username = '' } = {}) => {
+  const keyword = username.trim();
+  const whereClause = keyword ? ' WHERE username LIKE ?' : '';
+  const params = keyword ? [`%${keyword}%`] : [];
+  const [rows] = await db.query(`SELECT COUNT(*) AS total FROM users${whereClause}`, params);
   return Number(rows[0]?.total || 0);
+};
+
+exports.updateRole = async ({ id, role }) => {
+  const [result] = await db.query(
+    'UPDATE users SET role = ? WHERE id = ? AND role <> "admin"',
+    [role, id]
+  );
+  return result.affectedRows;
 };

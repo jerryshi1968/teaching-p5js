@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Users, School } from 'lucide-react';
-import { fetchAdminUsers } from '../services/api';
+import { fetchAdminUsers, updateAdminUserRole } from '../services/api';
 
 const PAGE_SIZE = 10;
 
@@ -14,6 +14,9 @@ const Admin = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [usernameKeyword, setUsernameKeyword] = useState('');
+  const [roleUpdatingId, setRoleUpdatingId] = useState(null);
 
   const currentUser = useMemo(() => {
     const userJson = localStorage.getItem('teaching_user');
@@ -37,7 +40,7 @@ const Admin = () => {
 
     setLoading(true);
     setError('');
-    fetchAdminUsers(page, PAGE_SIZE)
+    fetchAdminUsers(page, PAGE_SIZE, usernameKeyword)
       .then(data => {
         setUsers(Array.isArray(data.items) ? data.items : []);
         setTotal(Number(data.total || 0));
@@ -49,7 +52,7 @@ const Admin = () => {
       .finally(() => {
         setLoading(false);
       });
-  }, [activeMenu, currentUser, page]);
+  }, [activeMenu, currentUser, page, usernameKeyword]);
 
   const formatDate = (value) => {
     if (!value) return '-';
@@ -75,6 +78,29 @@ const Admin = () => {
     if (role === 'teacher') return '教师';
     if (role === 'student') return '学生';
     return role || '-';
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setPage(1);
+    setUsernameKeyword(searchInput.trim());
+  };
+
+  const handleRoleChange = async (user, role) => {
+    if (user.role === role || user.role === 'admin') return;
+
+    try {
+      setError('');
+      setRoleUpdatingId(user.id);
+      await updateAdminUserRole(user.id, role);
+      setUsers((currentUsers) => currentUsers.map((item) => (
+        item.id === user.id ? { ...item, role } : item
+      )));
+    } catch (err) {
+      setError(err.message || '修改用户角色失败，请重试。');
+    } finally {
+      setRoleUpdatingId(null);
+    }
   };
 
   const formatDateTime = (value) => {
@@ -144,6 +170,37 @@ const Admin = () => {
               <p className="text-xs text-slate-400 font-bold mt-0.5">共 {total} 个用户</p>
             )}
           </div>
+          {activeMenu === 'users' && (
+            <form onSubmit={handleSearch} className="flex items-center gap-2">
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                placeholder="按用户名查找"
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+                disabled={loading}
+              >
+                查找
+              </button>
+              {usernameKeyword && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput('');
+                    setUsernameKeyword('');
+                    setPage(1);
+                  }}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-500 transition hover:bg-slate-100"
+                >
+                  清空
+                </button>
+              )}
+            </form>
+          )}
         </header>
 
         <section className="p-6">
@@ -181,7 +238,21 @@ const Admin = () => {
                           <td className="px-4 py-3 text-slate-600">{user.phone || '-'}</td>
                           <td className="px-4 py-3 text-slate-600">{formatGender(user.gender)}</td>
                           <td className="px-4 py-3 text-slate-600">{formatDate(user.birthday)}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatRole(user.role)}</td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {user.role === 'admin' ? (
+                              <span>{formatRole(user.role)}</span>
+                            ) : (
+                              <select
+                                value={user.role}
+                                onChange={(e) => handleRoleChange(user, e.target.value)}
+                                disabled={roleUpdatingId === user.id}
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50"
+                              >
+                                <option value="student">学生</option>
+                                <option value="teacher">教师</option>
+                              </select>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-slate-600">{formatDateTime(user.created_at)}</td>
                         </tr>
                       ))
