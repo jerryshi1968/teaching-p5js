@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarDays, KeyRound, Phone, Save, User, Users, X } from 'lucide-react';
+import { CalendarDays, Eye, EyeOff, KeyRound, Lock, Phone, Save, User, Users, X } from 'lucide-react';
 
 const currentYear = new Date().getFullYear();
 const birthdayYears = Array.from({ length: 100 }, (_, index) => currentYear - index);
@@ -28,6 +28,16 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordErrorMsg, setPasswordErrorMsg] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
   const [form, setForm] = useState({
     username: '',
     phone: '',
@@ -80,10 +90,91 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (open) return;
+
+    setPasswordDialogOpen(false);
+    setPasswordSaving(false);
+    setPasswordErrorMsg('');
+    setShowOldPassword(false);
+    setShowNewPassword(false);
+    setPasswordForm({
+      oldPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+  }, [open]);
+
   if (!open) return null;
 
   const updateField = (field, value) => {
     setForm((previousForm) => ({ ...previousForm, [field]: value }));
+  };
+
+  const updatePasswordField = (field, value) => {
+    setPasswordForm((previousForm) => ({ ...previousForm, [field]: value }));
+  };
+
+  const closePasswordDialog = () => {
+    setPasswordDialogOpen(false);
+    setPasswordErrorMsg('');
+    setShowOldPassword(false);
+    setShowNewPassword(false);
+    setPasswordForm({
+      oldPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setPasswordErrorMsg('');
+
+    if (!passwordForm.oldPassword.trim() || !passwordForm.newPassword.trim() || !passwordForm.confirmPassword.trim()) {
+      setPasswordErrorMsg('旧密码、新密码和确认密码都要填写。');
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordErrorMsg('两次输入的新密码不一致，请再检查一下。');
+      return;
+    }
+
+    setPasswordSaving(true);
+
+    try {
+      const token = localStorage.getItem('teaching_token');
+      const response = await fetch('/api/auth/me/password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          oldPassword: passwordForm.oldPassword,
+          newPassword: passwordForm.newPassword,
+          confirmPassword: passwordForm.confirmPassword
+        })
+      });
+      const rawText = await response.text();
+      let data = null;
+
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok && response.status === 401) throw new Error(data?.message || '旧密码不正确，请重新输入。');
+      if (!response.ok) throw new Error(data?.message || '密码修改失败，请重试。');
+
+      closePasswordDialog();
+    } catch (err) {
+      setPasswordErrorMsg(err.message);
+    } finally {
+      setPasswordSaving(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -303,8 +394,8 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
 
             <button
               type="button"
-              disabled
-              className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl border-2 border-slate-200 bg-slate-100 px-4 py-3 text-sm font-black text-slate-400"
+              onClick={() => setPasswordDialogOpen(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-700 transition hover:border-amber-300 hover:bg-amber-100 active:translate-y-0.5"
             >
               <KeyRound className="h-4 w-4" />
               修改密码
@@ -328,6 +419,125 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
               </button>
             </div>
           </form>
+        )}
+
+        {passwordDialogOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-[2rem] border-4 border-white bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.24)]">
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-amber-200 bg-amber-100 text-amber-600">
+                    <KeyRound className="h-6 w-6 stroke-[3px]" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-800">修改密码</h3>
+                    <p className="mt-1 text-xs font-bold text-slate-400">输入旧密码，再确认两次新密码</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closePasswordDialog}
+                  className="rounded-full p-1 text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
+                  aria-label="关闭修改密码对话框"
+                >
+                  <X className="h-4.5 w-4.5" />
+                </button>
+              </div>
+
+              {passwordErrorMsg && (
+                <div className="mb-4 rounded-2xl border-2 border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700">
+                  {passwordErrorMsg}
+                </div>
+              )}
+
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div>
+                  <label className="mb-1.5 ml-1 block text-xs font-black text-slate-500">旧密码</label>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <input
+                      type={showOldPassword ? 'text' : 'password'}
+                      required
+                      value={passwordForm.oldPassword}
+                      onChange={(e) => updatePasswordField('oldPassword', e.target.value)}
+                      className="block w-full rounded-2xl border-2 border-slate-200 bg-slate-50 py-3 pl-11 pr-11 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
+                      placeholder="请输入当前密码"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowOldPassword(!showOldPassword)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 transition hover:text-slate-600"
+                      aria-label={showOldPassword ? '隐藏旧密码' : '显示旧密码'}
+                    >
+                      {showOldPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 ml-1 block text-xs font-black text-slate-500">新密码</label>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                      <KeyRound className="h-5 w-5" />
+                    </div>
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      value={passwordForm.newPassword}
+                      onChange={(e) => updatePasswordField('newPassword', e.target.value)}
+                      className="block w-full rounded-2xl border-2 border-slate-200 bg-slate-50 py-3 pl-11 pr-11 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
+                      placeholder="请输入新密码"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 transition hover:text-slate-600"
+                      aria-label={showNewPassword ? '隐藏新密码' : '显示新密码'}
+                    >
+                      {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 ml-1 block text-xs font-black text-slate-500">确认新密码</label>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                      <KeyRound className="h-5 w-5" />
+                    </div>
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => updatePasswordField('confirmPassword', e.target.value)}
+                      className="block w-full rounded-2xl border-2 border-slate-200 bg-slate-50 py-3 pl-11 pr-3 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
+                      placeholder="请再次输入新密码"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={closePasswordDialog}
+                    className="rounded-2xl border-2 border-slate-200 bg-slate-100 px-5 py-2.5 text-sm font-black text-slate-500 transition hover:bg-slate-200"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={passwordSaving}
+                    className="flex items-center gap-2 rounded-2xl border-b-4 border-amber-600 bg-amber-400 px-5 py-2.5 text-sm font-black text-amber-950 shadow-sm transition-all active:translate-y-1 active:border-b-0 disabled:opacity-50"
+                  >
+                    <Save className="h-4 w-4" />
+                    {passwordSaving ? '提交中...' : '确认修改'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -142,6 +142,45 @@ exports.updateMe = async (req, res, next) => {
   }
 };
 
+exports.changePassword = async (req, res, next) => {
+  try {
+    const { oldPassword, newPassword, confirmPassword } = req.body;
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ message: '旧密码、新密码和确认密码不能为空。' });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: '两次输入的新密码不一致，请重新检查。' });
+    }
+
+    const user = await User.findPasswordById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: '用户不存在。' });
+    }
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: '旧密码不正确，请重新输入。' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+    const affectedRows = await User.updatePassword({
+      id: req.user.id,
+      passwordHash
+    });
+
+    if (affectedRows === 0) {
+      return res.status(404).json({ message: '用户不存在。' });
+    }
+
+    res.json({ message: '密码已修改。' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.login = async (req, res, next) => {
   try {
     const { username, password } = req.body;

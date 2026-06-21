@@ -10,6 +10,11 @@ exports.findById = async (id) => {
   return rows[0] || null;
 };
 
+exports.findPasswordById = async (id) => {
+  const [rows] = await db.query('SELECT id, password_hash FROM users WHERE id = ?', [id]);
+  return rows[0] || null;
+};
+
 exports.existsByUsername = async (username) => {
   const [rows] = await db.query('SELECT id FROM users WHERE username = ? LIMIT 1', [username]);
   return rows.length > 0;
@@ -32,6 +37,14 @@ exports.updateProfile = async ({ id, username, phone, classCode = null, gender =
   const [result] = await db.query(
     'UPDATE users SET username = ?, phone = ?, class_code = ?, gender = ?, birthday = ? WHERE id = ?',
     [username, phone, classCode, gender, birthday, id]
+  );
+  return result.affectedRows;
+};
+
+exports.updatePassword = async ({ id, passwordHash }) => {
+  const [result] = await db.query(
+    'UPDATE users SET password_hash = ? WHERE id = ?',
+    [passwordHash, id]
   );
   return result.affectedRows;
 };
