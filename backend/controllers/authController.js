@@ -10,6 +10,26 @@ const isValidBirthday = (birthday) => {
   return date.toISOString().slice(0, 10) === birthday;
 };
 
+const formatBirthday = (birthday) => {
+  if (!birthday) return null;
+  if (typeof birthday === 'string') return birthday.slice(0, 10);
+
+  const year = birthday.getFullYear();
+  const month = String(birthday.getMonth() + 1).padStart(2, '0');
+  const day = String(birthday.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatUserProfile = (user) => ({
+  id: user.id,
+  username: user.username,
+  phone: user.phone || '',
+  classCode: user.class_code || '',
+  gender: user.gender || null,
+  birthday: formatBirthday(user.birthday),
+  role: user.role
+});
+
 exports.register = async (req, res, next) => {
   try {
     const { username, password, phone, classCode, gender, birthday } = req.body;
@@ -49,6 +69,74 @@ exports.register = async (req, res, next) => {
     });
 
     res.status(201).json({ message: '注册成功！' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getMe = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: '用户不存在。' });
+    }
+
+    res.json(formatUserProfile(user));
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateMe = async (req, res, next) => {
+  try {
+    const { username, phone, classCode, gender, birthday } = req.body;
+
+    if (!username || !phone) {
+      return res.status(400).json({ message: '用户名和手机号不能为空。' });
+    }
+
+    const cleanUsername = username.trim();
+    const cleanPhone = phone.trim();
+
+    if (!cleanUsername) {
+      return res.status(400).json({ message: '用户名不能为空。' });
+    }
+
+    if (!cleanPhone) {
+      return res.status(400).json({ message: '手机号不能为空。' });
+    }
+
+    if (gender && !['male', 'female'].includes(gender)) {
+      return res.status(400).json({ message: '性别选项不正确。' });
+    }
+
+    if (birthday && !isValidBirthday(birthday)) {
+      return res.status(400).json({ message: '生日格式不正确。' });
+    }
+
+    const userExists = await User.existsByUsernameExceptId(cleanUsername, req.user.id);
+    if (userExists) {
+      return res.status(409).json({ message: '该用户名已被占用，请尝试其他登录名。' });
+    }
+
+    const affectedRows = await User.updateProfile({
+      id: req.user.id,
+      username: cleanUsername,
+      phone: cleanPhone,
+      classCode: classCode?.trim() || null,
+      gender: gender || null,
+      birthday: birthday || null
+    });
+
+    if (affectedRows === 0) {
+      return res.status(404).json({ message: '用户不存在。' });
+    }
+
+    const updatedUser = await User.findById(req.user.id);
+    res.json({
+      user: formatUserProfile(updatedUser),
+      message: '个人信息已更新。'
+    });
   } catch (err) {
     next(err);
   }

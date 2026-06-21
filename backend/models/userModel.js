@@ -5,8 +5,18 @@ exports.findByUsername = async (username) => {
   return rows[0] || null;
 };
 
+exports.findById = async (id) => {
+  const [rows] = await db.query('SELECT id, username, phone, class_code, gender, birthday, role FROM users WHERE id = ?', [id]);
+  return rows[0] || null;
+};
+
 exports.existsByUsername = async (username) => {
   const [rows] = await db.query('SELECT id FROM users WHERE username = ? LIMIT 1', [username]);
+  return rows.length > 0;
+};
+
+exports.existsByUsernameExceptId = async (username, id) => {
+  const [rows] = await db.query('SELECT id FROM users WHERE username = ? AND id <> ? LIMIT 1', [username, id]);
   return rows.length > 0;
 };
 
@@ -16,6 +26,14 @@ exports.create = async ({ username, passwordHash, phone, classCode = null, gende
     [username, phone, classCode, gender, birthday, passwordHash, role]
   );
   return result.insertId;
+};
+
+exports.updateProfile = async ({ id, username, phone, classCode = null, gender = null, birthday = null }) => {
+  const [result] = await db.query(
+    'UPDATE users SET username = ?, phone = ?, class_code = ?, gender = ?, birthday = ? WHERE id = ?',
+    [username, phone, classCode, gender, birthday, id]
+  );
+  return result.affectedRows;
 };
 
 exports.listStudents = async () => {

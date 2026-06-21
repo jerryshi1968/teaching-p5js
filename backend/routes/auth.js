@@ -7,6 +7,8 @@ router.post('/register', authController.register);
 router.post('/login', authController.login);
 
 const authMiddleware = require('../middleware/authMiddleware');
+router.get('/me', authMiddleware, authController.getMe);
+router.put('/me', authMiddleware, authController.updateMe);
 router.get('/students', authMiddleware, authController.listStudents);
 
 module.exports = router;

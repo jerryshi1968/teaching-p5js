@@ -4,6 +4,7 @@ import { Folder, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Pa
 // 导入网络请求工具
 import { fetchMyProjects, copyProject } from '../services/api';
 import { useAppDialog } from '../hooks/useAppDialog';
+import ProfileDialog from '../components/Common/ProfileDialog';
 
 const DASHBOARD_SELECTED_STUDENT_KEY = 'teaching_dashboard_selected_student';
 
@@ -13,6 +14,7 @@ const Dashboard = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
 
   // === 教师模式新增状态 ===
   const [students, setStudents] = useState([]); // 存放学生列表
@@ -246,9 +248,28 @@ const Dashboard = () => {
     }
   };
 
+  const handleProfileSaved = async (updatedUser) => {
+    const nextUser = {
+      id: updatedUser.id,
+      username: updatedUser.username,
+      role: updatedUser.role
+    };
+    localStorage.setItem('teaching_user', JSON.stringify(nextUser));
+    setCurrentUser(nextUser);
+    await appDialog.alert({
+      title: '保存成功',
+      message: '个人信息已经更新啦。'
+    });
+  };
+
   return (
     <>
     {appDialog.dialog}
+    <ProfileDialog
+      open={profileDialogOpen}
+      onClose={() => setProfileDialogOpen(false)}
+      onSaved={handleProfileSaved}
+    />
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-indigo-50 to-pink-100 text-slate-800 flex flex-col font-sans">
       
       {/* 顶部全局导航栏 */}
@@ -265,7 +286,12 @@ const Dashboard = () => {
 
         <div className="flex items-center space-x-6">
           {/* 显示当前登录用户名 - 多角色微章样式 */}
-          <div className="flex items-center space-x-2 bg-indigo-50/80 px-3.5 py-1.5 rounded-2xl border-2 border-indigo-200 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setProfileDialogOpen(true)}
+            className="flex items-center space-x-2 bg-indigo-50/80 px-3.5 py-1.5 rounded-2xl border-2 border-indigo-200 shadow-sm transition hover:bg-indigo-100 hover:border-indigo-300 active:translate-y-0.5"
+            title="修改个人信息"
+          >
             <div className="bg-indigo-200 p-1 rounded-full">
               <User className="w-4 h-4 text-indigo-600" />
             </div>
@@ -276,7 +302,7 @@ const Dashboard = () => {
               {/* 角色判断 */}
               {currentUser?.role === 'teacher' ? '教师' : currentUser?.role === 'admin' ? '管理员' : '小极客'}
             </span>
-          </div>
+          </button>
 
           {/* 登出按钮 */}
           <button
