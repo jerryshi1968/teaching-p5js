@@ -55,3 +55,16 @@ exports.listStudents = async () => {
   );
   return rows;
 };
+
+exports.listUsersPaginated = async ({ limit, offset }) => {
+  const [rows] = await db.query(
+    'SELECT id, username, phone, gender, DATE_FORMAT(birthday, "%Y-%m-%d") AS birthday, role, created_at FROM users ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?',
+    [limit, offset]
+  );
+  return rows;
+};
+
+exports.countUsers = async () => {
+  const [rows] = await db.query('SELECT COUNT(*) AS total FROM users');
+  return Number(rows[0]?.total || 0);
+};

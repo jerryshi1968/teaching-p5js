@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Folder, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy } from 'lucide-react';
+import { Folder, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy, ShieldCheck } from 'lucide-react';
 // 导入网络请求工具
 import { fetchMyProjects, copyProject } from '../services/api';
 import { useAppDialog } from '../hooks/useAppDialog';
@@ -303,6 +303,18 @@ const Dashboard = () => {
               {currentUser?.role === 'teacher' ? '教师' : currentUser?.role === 'admin' ? '管理员' : '小极客'}
             </span>
           </button>
+
+          {currentUser?.role === 'admin' && (
+            <button
+              type="button"
+              onClick={() => navigate('/admin')}
+              className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-2 border-emerald-200 hover:border-emerald-300 px-3.5 py-1.5 rounded-2xl text-xs font-black transition active:translate-y-0.5"
+              title="管理"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>管理</span>
+            </button>
+          )}
 
           {/* 登出按钮 */}
           <button

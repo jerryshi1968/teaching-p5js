@@ -39,6 +39,7 @@ app.get('/api/health', async (req, res) => {
 
 // 3. 业务路由挂载
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/admin', require('./routes/admin'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/files', require('./routes/files'));
 

@@ -23,6 +23,22 @@ export const fetchMyProjects = async (studentId = null) => {
   return response.json();
 };
 
+export const fetchAdminUsers = async (page = 1, pageSize = 10) => {
+  const response = await fetch(`/api/admin/users?page=${page}&pageSize=${pageSize}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    }
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权访问管理页面。');
+  }
+  if (!response.ok) throw new Error(data?.message || `获取用户列表失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
 export const copyProject = async (projectId) => {
   const requestCopyProject = async (url, body) => {
     const response = await fetch(url, {

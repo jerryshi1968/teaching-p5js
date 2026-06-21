@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import EditorView from './pages/EditorView';
+import Admin from './pages/Admin';
 
 /**
  * 路由守卫组件：检查 localStorage 中是否存在登录 Token
@@ -40,6 +41,14 @@ function App() {
               <EditorView />
             </PrivateRoute>
           } 
+        />
+        <Route
+          path="/admin"
+          element={
+            <PrivateRoute>
+              <Admin />
+            </PrivateRoute>
+          }
         />
 
         {/* 4. 兜底路由：匹配不到任何路径时，自动重定向到 /dashboard */}
