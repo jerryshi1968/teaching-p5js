@@ -824,13 +824,13 @@ const Dashboard = () => {
                 </div>
 
                 <div>
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-black text-base text-indigo-700 truncate w-4/5">
+                  <div className="space-y-2">
+                    <h3 className="font-black text-base text-indigo-700 truncate pr-10">
                       📁 {group.name}
                     </h3>
 
                     {selectedStudentId === 'me' && (
-                      <div className="flex items-center space-x-1 shrink-0">
+                      <div className="flex items-center justify-end space-x-1">
                         <button
                           onClick={(e) => handleReorderGroup(e, index, -1)}
                           disabled={index === 0}
@@ -897,13 +897,13 @@ const Dashboard = () => {
                   </div>
 
                   <div>
-                    <div className="flex justify-between items-start">
-                      <h3 className={`font-black text-base text-slate-800 ${style.text} truncate w-4/5`}>
+                    <div className="space-y-2">
+                      <h3 className={`font-black text-base text-slate-800 ${style.text} truncate pr-10`}>
                         ✨ {project.name}
                       </h3>
                       
                       {selectedStudentId !== 'me' && (
-                        <div className="flex items-center space-x-1 shrink-0">
+                        <div className="flex items-center justify-end space-x-1">
                           <button
                             onClick={(e) => handleCopyProject(e, project)}
                             className="text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-xl transition duration-150"
@@ -916,7 +916,7 @@ const Dashboard = () => {
 
                       {/* 操作按钮区（仅在看自己的项目时显示，防止老师误修改或误删学生作品） */}
                       {selectedStudentId === 'me' && (
-                        <div className="flex items-center space-x-1 shrink-0">
+                        <div className="flex items-center justify-end space-x-1">
                           <button
                             onClick={(e) => handleReorderProject(e, index, -1)}
                             disabled={index === 0}
