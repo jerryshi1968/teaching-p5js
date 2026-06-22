@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Folder, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy, ShieldCheck } from 'lucide-react';
 // 导入网络请求工具
-import { fetchMyProjects, copyProject } from '../services/api';
+import { fetchMyProjects, copyProject, fetchMyClasses, fetchStudentsByClass } from '../services/api';
 import { useAppDialog } from '../hooks/useAppDialog';
 import ProfileDialog from '../components/Common/ProfileDialog';
 
-const DASHBOARD_SELECTED_STUDENT_KEY = 'teaching_dashboard_selected_student';
+const DASHBOARD_SELECTED_CLASS_KEY = 'teaching_dashboard_selected_class_code';
+const DASHBOARD_SELECTED_STUDENT_KEY = 'teaching_dashboard_selected_student_id';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -17,8 +18,11 @@ const Dashboard = () => {
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
 
   // === 教师模式新增状态 ===
+  const [teacherClasses, setTeacherClasses] = useState([]); // 存放教师绑定的班级列表
+  const [selectedClassCode, setSelectedClassCode] = useState(() => localStorage.getItem(DASHBOARD_SELECTED_CLASS_KEY) || ''); // 当前选中的班级码
   const [students, setStudents] = useState([]); // 存放学生列表
-  const [selectedStudentId, setSelectedStudentId] = useState(() => sessionStorage.getItem(DASHBOARD_SELECTED_STUDENT_KEY) || 'me'); // 当前选中的学生 ID，默认为 'me' (自己)
+  const [studentsLoaded, setStudentsLoaded] = useState(false); // 标记当前班级学生列表是否已加载
+  const [selectedStudentId, setSelectedStudentId] = useState(() => localStorage.getItem(DASHBOARD_SELECTED_STUDENT_KEY) || 'me'); // 当前选中的学生 ID，默认为 'me' (自己)
 
   // 定义马卡龙卡通色系，让项目卡片五彩缤纷
   const cardStyles = [
@@ -44,6 +48,7 @@ const Dashboard = () => {
   };
 
   const findSelectedStudent = () => students.find(s => String(s.id) === String(selectedStudentId));
+  const findSelectedClass = () => teacherClasses.find(c => String(c.class_code) === String(selectedClassCode));
 
   // 1. 初始化：获取用户信息
   useEffect(() => {
@@ -59,25 +64,74 @@ const Dashboard = () => {
       }
     }
 
-    // 如果当前登录的是教师，拉取学生列表
+    // 如果当前登录的是教师，拉取班级列表
     if (parsedUser && parsedUser.role === 'teacher') {
-      const token = localStorage.getItem('teaching_token');
-      fetch('/api/auth/students', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => res.json())
+      fetchMyClasses()
         .then(data => {
-          if (Array.isArray(data)) {
-            setStudents(data);
+          const classes = Array.isArray(data) ? data : [];
+          const savedClassCode = localStorage.getItem(DASHBOARD_SELECTED_CLASS_KEY) || '';
+          const nextClassCode = classes.some(item => item.class_code === savedClassCode)
+            ? savedClassCode
+            : (classes[0]?.class_code || '');
+          setTeacherClasses(classes);
+          setSelectedClassCode(nextClassCode);
+          if (nextClassCode) {
+            localStorage.setItem(DASHBOARD_SELECTED_CLASS_KEY, nextClassCode);
+          } else {
+            localStorage.removeItem(DASHBOARD_SELECTED_CLASS_KEY);
+            localStorage.setItem(DASHBOARD_SELECTED_STUDENT_KEY, 'me');
+            setSelectedStudentId('me');
           }
         })
-        .catch(err => console.error('拉取学生列表失败', err));
+        .catch(err => console.error('拉取班级列表失败', err));
     }
   }, []);
 
   useEffect(() => {
-    sessionStorage.setItem(DASHBOARD_SELECTED_STUDENT_KEY, selectedStudentId);
+    localStorage.setItem(DASHBOARD_SELECTED_STUDENT_KEY, selectedStudentId);
   }, [selectedStudentId]);
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'teacher') return;
+
+    if (!selectedClassCode) {
+      setStudents([]);
+      setStudentsLoaded(true);
+      setSelectedStudentId('me');
+      return;
+    }
+
+    localStorage.setItem(DASHBOARD_SELECTED_CLASS_KEY, selectedClassCode);
+    setStudentsLoaded(false);
+    fetchStudentsByClass(selectedClassCode)
+      .then(data => {
+        const nextStudents = Array.isArray(data) ? data : [];
+        const savedStudentId = localStorage.getItem(DASHBOARD_SELECTED_STUDENT_KEY) || 'me';
+        const nextStudentId = savedStudentId === 'me' || nextStudents.some(item => String(item.id) === String(savedStudentId))
+          ? savedStudentId
+          : 'me';
+        setStudents(nextStudents);
+        setSelectedStudentId(nextStudentId);
+        setStudentsLoaded(true);
+      })
+      .catch(err => {
+        console.error('拉取班级学生列表失败', err);
+        setStudents([]);
+        setSelectedStudentId('me');
+        setStudentsLoaded(true);
+      });
+  }, [currentUser, selectedClassCode]);
+
+  const handleClassChange = (classCode) => {
+    setSelectedClassCode(classCode);
+    setSelectedStudentId('me');
+    localStorage.setItem(DASHBOARD_SELECTED_STUDENT_KEY, 'me');
+    if (classCode) {
+      localStorage.setItem(DASHBOARD_SELECTED_CLASS_KEY, classCode);
+    } else {
+      localStorage.removeItem(DASHBOARD_SELECTED_CLASS_KEY);
+    }
+  };
 
   // 2. 监听选中学生的变化，动态拉取作品列表
   useEffect(() => {
@@ -87,6 +141,8 @@ const Dashboard = () => {
       setSelectedStudentId('me');
       return;
     }
+
+    if (currentUser.role === 'teacher' && selectedStudentId !== 'me' && !studentsLoaded) return;
 
     setLoading(true);
     // 如果选中的是 'me'，传入 null（拉取自己的项目）；否则传入具体的学生 ID
@@ -101,7 +157,7 @@ const Dashboard = () => {
         console.error('拉取项目列表失败', err);
         setLoading(false);
       });
-  }, [selectedStudentId, currentUser]);
+  }, [selectedStudentId, currentUser, studentsLoaded]);
 
   // 3. 创建新项目逻辑
   const handleCreateProject = async () => {
@@ -243,7 +299,8 @@ const Dashboard = () => {
     })) {
       localStorage.removeItem('teaching_token');
       localStorage.removeItem('teaching_user');
-      sessionStorage.removeItem(DASHBOARD_SELECTED_STUDENT_KEY);
+      localStorage.removeItem(DASHBOARD_SELECTED_CLASS_KEY);
+      localStorage.removeItem(DASHBOARD_SELECTED_STUDENT_KEY);
       navigate('/login');
     }
   };
@@ -334,38 +391,68 @@ const Dashboard = () => {
         {/* === 【教师专属】学生看板控制区 === */}
         {currentUser?.role === 'teacher' && (
           <div className="mb-8 bg-white/80 border-4 border-indigo-100 rounded-[2rem] p-5 shadow-[0_6px_16px_rgba(0,0,0,0.02)]">
-            <h3 className="text-xs font-black text-indigo-950 mb-3.5 flex items-center gap-2">
-              <User className="w-4.5 h-4.5 text-indigo-500" />
-              <span>👩‍🏫 班级学生作品督导看板（点击下方学生名字可以查看其作品哦）：</span>
-            </h3>
-            <div className="flex flex-wrap gap-2.5">
-              {/* “我”的选项卡 */}
-              <button
-                onClick={() => setSelectedStudentId('me')}
-                className={`px-4 py-2 rounded-2xl text-xs font-black border-2 transition-all transform active:translate-y-0.5 ${
-                  selectedStudentId === 'me'
-                    ? 'bg-indigo-400 border-indigo-500 text-white shadow-md'
-                    : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                }`}
-              >
-                🙋‍♂️ 我 (我的项目)
-              </button>
-
-              {/* 循环渲染学生列表 */}
-              {students.map((student) => (
-                <button
-                  key={student.id}
-                  onClick={() => setSelectedStudentId(String(student.id))}
-                  className={`px-4 py-2 rounded-2xl text-xs font-black border-2 transition-all transform active:translate-y-0.5 ${
-                  String(selectedStudentId) === String(student.id)
-                      ? 'bg-indigo-400 border-indigo-500 text-white shadow-md'
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                }`}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+              <h3 className="text-xs font-black text-indigo-950 flex items-center gap-2">
+                <User className="w-4.5 h-4.5 text-indigo-500" />
+                <span>👩‍🏫 班级学生作品督导看板</span>
+              </h3>
+              <label className="flex items-center gap-2 text-xs font-black text-slate-500">
+                <span>班级</span>
+                <select
+                  value={selectedClassCode}
+                  onChange={(e) => handleClassChange(e.target.value)}
+                  className="min-w-48 rounded-2xl border-2 border-indigo-100 bg-white px-3 py-2 text-xs font-black text-indigo-950 outline-none transition focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
+                  disabled={teacherClasses.length === 0}
                 >
-                  👤 {student.username}
-                </button>
-              ))}
+                  {teacherClasses.length === 0 ? (
+                    <option value="">暂无班级</option>
+                  ) : (
+                    teacherClasses.map((classItem) => (
+                      <option key={classItem.id} value={classItem.class_code}>{classItem.name}</option>
+                    ))
+                  )}
+                </select>
+              </label>
             </div>
+
+            {teacherClasses.length === 0 ? (
+              <p className="text-xs font-bold text-slate-400">你还没有绑定任何班级，请联系管理员。</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-slate-400">当前班级：{findSelectedClass()?.name || '未选择班级'}</p>
+                <div className="flex flex-wrap gap-2.5">
+                  {/* “我”的选项卡 */}
+                  <button
+                    onClick={() => setSelectedStudentId('me')}
+                    className={`px-4 py-2 rounded-2xl text-xs font-black border-2 transition-all transform active:translate-y-0.5 ${
+                      selectedStudentId === 'me'
+                        ? 'bg-indigo-400 border-indigo-500 text-white shadow-md'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                    }`}
+                  >
+                    🙋‍♂️ 我 (我的项目)
+                  </button>
+
+                  {/* 循环渲染学生列表 */}
+                  {students.map((student) => (
+                    <button
+                      key={student.id}
+                      onClick={() => setSelectedStudentId(String(student.id))}
+                      className={`px-4 py-2 rounded-2xl text-xs font-black border-2 transition-all transform active:translate-y-0.5 ${
+                      String(selectedStudentId) === String(student.id)
+                          ? 'bg-indigo-400 border-indigo-500 text-white shadow-md'
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                    }`}
+                    >
+                      👤 {student.username}
+                    </button>
+                  ))}
+                </div>
+                {studentsLoaded && students.length === 0 && (
+                  <p className="text-xs font-bold text-slate-400">该班级暂无学生。</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

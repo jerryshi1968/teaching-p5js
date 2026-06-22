@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/userModel');
+const Class = require('../models/classModel');
 const Verification = require('../models/verificationModel');
 const smsService = require('../services/smsService');
 require('dotenv').config();
@@ -412,6 +413,48 @@ exports.listStudents = async (req, res, next) => {
     }
 
     const students = await User.listStudents();
+    res.json(students);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.listMyClasses = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ message: '无权查看班级列表。' });
+    }
+
+    const classes = await Class.listByTeacherUserId(req.user.id);
+    res.json(classes);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.listStudentsByClass = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ message: '无权查看班级学生列表。' });
+    }
+
+    const classCode = typeof req.params.classCode === 'string' ? req.params.classCode.trim() : '';
+    if (!classCode) {
+      return res.status(400).json({ message: '班级码不能为空。' });
+    }
+
+    const teacherClass = await Class.findByTeacherAndCode({
+      teacherUserId: req.user.id,
+      classCode
+    });
+    if (!teacherClass) {
+      return res.status(404).json({ message: '班级不存在或无权访问。' });
+    }
+
+    const students = await User.listStudentsByTeacherClass({
+      teacherUserId: req.user.id,
+      classCode
+    });
     res.json(students);
   } catch (err) {
     next(err);

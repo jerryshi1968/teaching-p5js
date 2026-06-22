@@ -43,6 +43,22 @@ exports.countByTeacherUserId = async (teacherUserId) => {
   return Number(rows[0]?.total || 0);
 };
 
+exports.listByTeacherUserId = async (teacherUserId) => {
+  const [rows] = await db.query(
+    'SELECT id, name, class_code FROM classes WHERE teacher_user_id = ? ORDER BY created_at DESC, id DESC',
+    [teacherUserId]
+  );
+  return rows;
+};
+
+exports.findByTeacherAndCode = async ({ teacherUserId, classCode }) => {
+  const [rows] = await db.query(
+    'SELECT id, name, class_code FROM classes WHERE teacher_user_id = ? AND class_code = ? LIMIT 1',
+    [teacherUserId, classCode]
+  );
+  return rows[0] || null;
+};
+
 exports.create = async ({ name, classCode, teacherUserId }) => {
   const [result] = await db.query(
     'INSERT INTO classes (name, class_code, teacher_user_id) VALUES (?, ?, ?)',

@@ -1,6 +1,6 @@
 const db = require('../config/db');
 
-const canAccessAllProjects = (user) => user.role === 'teacher' || user.role === 'admin';
+const canAccessAllProjects = (user) => user.role === 'admin';
 
 exports.getConnection = () => db.getConnection();
 
@@ -13,11 +13,52 @@ exports.listForUser = async (userId) => {
 };
 
 exports.listVisibleToUser = async ({ currentUser, studentId }) => {
-  const targetUserId = canAccessAllProjects(currentUser) && studentId
-    ? studentId
-    : currentUser.id;
+  if (!studentId) {
+    return exports.listForUser(currentUser.id);
+  }
 
-  return exports.listForUser(targetUserId);
+  if (canAccessAllProjects(currentUser)) {
+    return exports.listForUser(studentId);
+  }
+
+  if (currentUser.role !== 'teacher') {
+    return null;
+  }
+
+  const [rows] = await db.query(
+    `SELECT p.id, p.name, p.created_at, p.updated_at
+     FROM projects p
+     JOIN users u ON p.user_id = u.id
+     JOIN classes c ON u.class_code = c.class_code
+     WHERE p.user_id = ? AND u.role = "student" AND c.teacher_user_id = ?
+     ORDER BY p.updated_at DESC`,
+    [studentId, currentUser.id]
+  );
+  return rows;
+};
+
+const findTeacherAccessibleProjectById = async (projectId, user) => {
+  const [rows] = await db.query(
+    `SELECT p.id, p.name, p.user_id
+     FROM projects p
+     JOIN users u ON p.user_id = u.id
+     JOIN classes c ON u.class_code = c.class_code
+     WHERE p.id = ? AND u.role = "student" AND c.teacher_user_id = ?`,
+    [projectId, user.id]
+  );
+  return rows[0] || null;
+};
+
+const findTeacherAccessibleProjectWithOwnerById = async (projectId, user) => {
+  const [rows] = await db.query(
+    `SELECT p.id, p.name, p.user_id, u.username AS owner_name
+     FROM projects p
+     JOIN users u ON p.user_id = u.id
+     JOIN classes c ON u.class_code = c.class_code
+     WHERE p.id = ? AND u.role = "student" AND c.teacher_user_id = ?`,
+    [projectId, user.id]
+  );
+  return rows[0] || null;
 };
 
 exports.createWithConnection = async (connection, { id, userId, name }) => {
@@ -41,6 +82,16 @@ exports.findAccessibleById = async (projectId, user) => {
     return rows[0] || null;
   }
 
+  if (user.role === 'teacher') {
+    const ownProject = await exports.findOwnedById(projectId, user.id);
+    if (ownProject) {
+      const [rows] = await db.query('SELECT id, name, user_id FROM projects WHERE id = ?', [projectId]);
+      return rows[0] || null;
+    }
+
+    return findTeacherAccessibleProjectById(projectId, user);
+  }
+
   const [rows] = await db.query(
     'SELECT id, name, user_id FROM projects WHERE id = ? AND user_id = ?',
     [projectId, user.id]
@@ -58,6 +109,19 @@ exports.findAccessibleWithOwnerById = async (projectId, user) => {
       [projectId]
     );
     return rows[0] || null;
+  }
+
+  if (user.role === 'teacher') {
+    const [ownRows] = await db.query(
+      `SELECT p.id, p.name, p.user_id, u.username AS owner_name
+       FROM projects p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.id = ? AND p.user_id = ?`,
+      [projectId, user.id]
+    );
+    if (ownRows[0]) return ownRows[0];
+
+    return findTeacherAccessibleProjectWithOwnerById(projectId, user);
   }
 
   const [rows] = await db.query(

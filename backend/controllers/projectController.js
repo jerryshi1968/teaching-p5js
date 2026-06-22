@@ -43,6 +43,10 @@ exports.listProjects = async (req, res, next) => {
       studentId: req.query.studentId
     });
 
+    if (!projects) {
+      return res.status(403).json({ message: '无权查看该学生的项目。' });
+    }
+
     res.json(projects);
   } catch (err) {
     next(err);
