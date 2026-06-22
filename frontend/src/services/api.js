@@ -64,6 +64,93 @@ export const updateAdminUserRole = async (userId, role) => {
   return data;
 };
 
+export const fetchAdminTeachers = async () => {
+  const response = await fetch('/api/admin/teachers', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    }
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权访问教师列表。');
+  }
+  if (!response.ok) throw new Error(data?.message || `获取教师列表失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const fetchAdminClasses = async (page = 1, pageSize = 10) => {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize)
+  });
+
+  const response = await fetch(`/api/admin/classes?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    }
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权访问班级管理页面。');
+  }
+  if (!response.ok) throw new Error(data?.message || `获取班级列表失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const createAdminClass = async (payload) => {
+  const response = await fetch('/api/admin/classes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权创建班级。');
+  }
+  if (!response.ok) throw new Error(data?.message || `创建班级失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const updateAdminClass = async (classId, payload) => {
+  const response = await fetch(`/api/admin/classes/${classId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权修改班级。');
+  }
+  if (!response.ok) throw new Error(data?.message || `修改班级失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const deleteAdminClass = async (classId) => {
+  const response = await fetch(`/api/admin/classes/${classId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    }
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权删除班级。');
+  }
+  if (!response.ok) throw new Error(data?.message || `删除班级失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
 export const copyProject = async (projectId) => {
   const requestCopyProject = async (url, body) => {
     const response = await fetch(url, {

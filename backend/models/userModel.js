@@ -56,12 +56,19 @@ exports.listStudents = async () => {
   return rows;
 };
 
+exports.listTeachers = async () => {
+  const [rows] = await db.query(
+    'SELECT id, username FROM users WHERE role = "teacher" ORDER BY username ASC'
+  );
+  return rows;
+};
+
 exports.listUsersPaginated = async ({ limit, offset, username = '' }) => {
   const keyword = username.trim();
-  const whereClause = keyword ? ' WHERE username LIKE ?' : '';
+  const whereClause = keyword ? ' WHERE u.username LIKE ?' : '';
   const params = keyword ? [`%${keyword}%`, limit, offset] : [limit, offset];
   const [rows] = await db.query(
-    `SELECT id, username, phone, gender, DATE_FORMAT(birthday, "%Y-%m-%d") AS birthday, role, created_at FROM users${whereClause} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+    `SELECT u.id, u.username, u.phone, u.class_code, c.name AS class_name, u.gender, DATE_FORMAT(u.birthday, "%Y-%m-%d") AS birthday, u.role, u.created_at FROM users u LEFT JOIN classes c ON u.class_code = c.class_code${whereClause} ORDER BY u.created_at DESC, u.id DESC LIMIT ? OFFSET ?`,
     params
   );
   return rows;
