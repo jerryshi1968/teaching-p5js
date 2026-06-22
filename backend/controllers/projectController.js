@@ -234,3 +234,64 @@ exports.updateProject = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.moveProject = async (req, res, next) => {
+  try {
+    const projectId = req.params.id;
+    const parentId = normalizeParentId(req.body.parentId);
+
+    if (Number.isNaN(parentId)) {
+      return res.status(400).json({ message: '目标作品组 ID 不正确。' });
+    }
+
+    const project = await Project.findOwnedById(projectId, req.user.id);
+    if (!project) {
+      return res.status(404).json({ message: '项目不存在或无权限。' });
+    }
+
+    if (parentId !== null) {
+      const parentGroup = await ProjectGroup.findOwnedById({ id: parentId, userId: req.user.id });
+      if (!parentGroup) {
+        return res.status(404).json({ message: '目标作品组不存在或无权访问。' });
+      }
+    }
+
+    const affectedRows = await Project.move({
+      projectId,
+      userId: req.user.id,
+      parentId
+    });
+    if (affectedRows === 0) {
+      return res.status(404).json({ message: '项目不存在或无权限。' });
+    }
+
+    res.json({ message: '项目已移动。' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.reorderProjects = async (req, res, next) => {
+  try {
+    const parentId = normalizeParentId(req.body.parentId);
+    const orderedIds = Array.isArray(req.body.orderedIds) ? req.body.orderedIds : [];
+
+    if (Number.isNaN(parentId)) {
+      return res.status(400).json({ message: '作品组 ID 不正确。' });
+    }
+
+    if (orderedIds.some((id) => !id || typeof id !== 'string')) {
+      return res.status(400).json({ message: '排序数据不正确。' });
+    }
+
+    await Project.reorder({
+      userId: req.user.id,
+      parentId,
+      orderedIds
+    });
+
+    res.json({ message: '项目排序已更新。' });
+  } catch (err) {
+    next(err);
+  }
+};

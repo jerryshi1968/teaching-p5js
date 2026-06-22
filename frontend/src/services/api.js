@@ -58,6 +58,19 @@ export const fetchProjectGroups = async ({ studentId = null, parentId = null } =
   return data;
 };
 
+export const fetchAllProjectGroups = async () => {
+  const response = await fetch('/api/project-groups/all', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    }
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || `获取作品组失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
 export const createProjectGroup = async ({ name, parentId = null }) => {
   const response = await fetch('/api/project-groups', {
     method: 'POST',
@@ -72,6 +85,34 @@ export const createProjectGroup = async ({ name, parentId = null }) => {
   return data;
 };
 
+export const moveProjectGroup = async (groupId, { parentId = null }) => {
+  const response = await fetch(`/api/project-groups/${groupId}/move`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify({ parentId })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || `移动作品组失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const reorderProjectGroups = async ({ parentId = null, orderedIds }) => {
+  const response = await fetch('/api/project-groups/reorder', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify({ parentId, orderedIds })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || `调整作品组排序失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
 export const updateProjectGroup = async (groupId, { name }) => {
   const response = await fetch(`/api/project-groups/${groupId}`, {
     method: 'PUT',
@@ -83,6 +124,34 @@ export const updateProjectGroup = async (groupId, { name }) => {
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data?.message || `修改作品组失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const moveProject = async (projectId, { parentId = null }) => {
+  const response = await fetch(`/api/projects/${projectId}/move`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify({ parentId })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || `移动项目失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const reorderProjects = async ({ parentId = null, orderedIds }) => {
+  const response = await fetch('/api/projects/reorder', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify({ parentId, orderedIds })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || `调整项目排序失败（HTTP ${response.status}），请重试。`);
   return data;
 };
 

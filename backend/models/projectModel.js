@@ -70,7 +70,7 @@ exports.createWithConnection = async (connection, { id, userId, name, parentId =
 
 exports.findOwnedById = async (projectId, userId) => {
   const [rows] = await db.query(
-    'SELECT id FROM projects WHERE id = ? AND user_id = ?',
+    'SELECT id, user_id, parent_id, sort_order FROM projects WHERE id = ? AND user_id = ?',
     [projectId, userId]
   );
   return rows[0] || null;
@@ -145,6 +145,36 @@ exports.updateName = async ({ projectId, userId, name }) => {
     [name, projectId, userId]
   );
   return result.affectedRows;
+};
+
+exports.move = async ({ projectId, userId, parentId = null }) => {
+  const [result] = await db.query(
+    'UPDATE projects SET parent_id = ? WHERE id = ? AND user_id = ?',
+    [parentId, projectId, userId]
+  );
+  return result.affectedRows;
+};
+
+exports.reorder = async ({ userId, parentId = null, orderedIds }) => {
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      await connection.query(
+        `UPDATE projects SET sort_order = ? WHERE id = ? AND user_id = ? AND ${parentId === null ? 'parent_id IS NULL' : 'parent_id = ?'}`,
+        parentId === null ? [index, orderedIds[index], userId] : [index, orderedIds[index], userId, parentId]
+      );
+    }
+
+    await connection.commit();
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 };
 
 exports.clearParentId = async ({ userId, parentId }) => {

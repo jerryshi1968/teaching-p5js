@@ -9,9 +9,11 @@ router.use(authMiddleware);
 router.get('/', projectController.listProjects);
 router.post('/', projectController.createProject);
 router.post('/copy', projectController.copyProject);
+router.put('/reorder', projectController.reorderProjects);
 router.post('/:id/copy', projectController.copyProject);
 router.delete('/:id', projectController.deleteProject);
 router.get('/:id', projectController.getProjectById);
+router.put('/:id/move', projectController.moveProject);
 router.put('/:id', projectController.updateProject);
 
 module.exports = router;

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Folder, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy, ShieldCheck } from 'lucide-react';
+import { ArrowDown, ArrowUp, Folder, MoveRight, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy, ShieldCheck } from 'lucide-react';
 // 导入网络请求工具
-import { fetchMyProjects, copyProject, fetchMyClasses, fetchStudentsByClass, fetchProjectGroups, createProjectGroup, updateProjectGroup, deleteProjectGroup } from '../services/api';
+import { fetchMyProjects, copyProject, fetchMyClasses, fetchStudentsByClass, fetchProjectGroups, fetchAllProjectGroups, createProjectGroup, updateProjectGroup, moveProjectGroup, reorderProjectGroups, deleteProjectGroup, moveProject, reorderProjects } from '../services/api';
 import { useAppDialog } from '../hooks/useAppDialog';
 import ProfileDialog from '../components/Common/ProfileDialog';
 
@@ -16,6 +16,10 @@ const Dashboard = () => {
   const [projectGroups, setProjectGroups] = useState([]);
   const [breadcrumbs, setBreadcrumbs] = useState([]);
   const [currentGroupId, setCurrentGroupId] = useState(null);
+  const [allProjectGroups, setAllProjectGroups] = useState([]);
+  const [moveDialog, setMoveDialog] = useState(null);
+  const [moveTargetId, setMoveTargetId] = useState('');
+  const [moveSaving, setMoveSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
@@ -52,6 +56,34 @@ const Dashboard = () => {
 
   const findSelectedStudent = () => students.find(s => String(s.id) === String(selectedStudentId));
   const findSelectedClass = () => teacherClasses.find(c => String(c.class_code) === String(selectedClassCode));
+  const getTargetStudentId = () => selectedStudentId === 'me' ? null : selectedStudentId;
+  const buildGroupPath = (group) => {
+    const groupMap = new Map(allProjectGroups.map((item) => [String(item.id), item]));
+    const names = [group.name];
+    let parentId = group.parent_id;
+
+    while (parentId) {
+      const parent = groupMap.get(String(parentId));
+      if (!parent) break;
+      names.unshift(parent.name);
+      parentId = parent.parent_id;
+    }
+
+    return names.join(' / ');
+  };
+  const refreshCurrentDirectory = async () => {
+    const targetStudentId = getTargetStudentId();
+    const [projectData, groupData] = await Promise.all([
+      fetchMyProjects(targetStudentId, currentGroupId),
+      fetchProjectGroups({ studentId: targetStudentId, parentId: currentGroupId })
+    ]);
+
+    if (projectData) setProjects(projectData);
+    if (groupData) {
+      setProjectGroups(Array.isArray(groupData.groups) ? groupData.groups : []);
+      setBreadcrumbs(Array.isArray(groupData.breadcrumbs) ? groupData.breadcrumbs : []);
+    }
+  };
   const handleStudentChange = (studentId) => {
     setCurrentGroupId(null);
     setSelectedStudentId(studentId);
@@ -284,6 +316,101 @@ const Dashboard = () => {
     }
   };
 
+  const handleOpenMoveDialog = async (e, type, item) => {
+    e.stopPropagation();
+
+    try {
+      const data = await fetchAllProjectGroups();
+      setAllProjectGroups(Array.isArray(data.groups) ? data.groups : []);
+      setMoveDialog({ type, item });
+      setMoveTargetId(item.parent_id ? String(item.parent_id) : '');
+    } catch (err) {
+      await appDialog.alert({
+        title: '打开移动失败',
+        message: err.message
+      });
+    }
+  };
+
+  const closeMoveDialog = () => {
+    if (moveSaving) return;
+
+    setMoveDialog(null);
+    setMoveTargetId('');
+  };
+
+  const handleSubmitMove = async (e) => {
+    e.preventDefault();
+    if (!moveDialog) return;
+
+    const parentId = moveTargetId ? Number(moveTargetId) : null;
+
+    try {
+      setMoveSaving(true);
+      if (moveDialog.type === 'group') {
+        await moveProjectGroup(moveDialog.item.id, { parentId });
+      } else {
+        await moveProject(moveDialog.item.id, { parentId });
+      }
+      await refreshCurrentDirectory();
+      setMoveDialog(null);
+      setMoveTargetId('');
+    } catch (err) {
+      await appDialog.alert({
+        title: '移动失败',
+        message: err.message
+      });
+    } finally {
+      setMoveSaving(false);
+    }
+  };
+
+  const handleReorderGroup = async (e, index, direction) => {
+    e.stopPropagation();
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= projectGroups.length) return;
+
+    const nextGroups = [...projectGroups];
+    [nextGroups[index], nextGroups[targetIndex]] = [nextGroups[targetIndex], nextGroups[index]];
+    setProjectGroups(nextGroups);
+
+    try {
+      await reorderProjectGroups({
+        parentId: currentGroupId,
+        orderedIds: nextGroups.map((group) => group.id)
+      });
+    } catch (err) {
+      setProjectGroups(projectGroups);
+      await appDialog.alert({
+        title: '排序失败',
+        message: err.message
+      });
+    }
+  };
+
+  const handleReorderProject = async (e, index, direction) => {
+    e.stopPropagation();
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= projects.length) return;
+
+    const nextProjects = [...projects];
+    [nextProjects[index], nextProjects[targetIndex]] = [nextProjects[targetIndex], nextProjects[index]];
+    setProjects(nextProjects);
+
+    try {
+      await reorderProjects({
+        parentId: currentGroupId,
+        orderedIds: nextProjects.map((project) => project.id)
+      });
+    } catch (err) {
+      setProjects(projects);
+      await appDialog.alert({
+        title: '排序失败',
+        message: err.message
+      });
+    }
+  };
+
   // 4. 删除项目逻辑
   const handleDeleteProject = async (e, id) => {
     e.stopPropagation(); // 阻止卡片点击跳转到编辑页
@@ -418,6 +545,49 @@ const Dashboard = () => {
       onClose={() => setProfileDialogOpen(false)}
       onSaved={handleProfileSaved}
     />
+    {moveDialog && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm">
+        <div className="w-full max-w-md rounded-[2rem] border-4 border-white bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.20)]">
+          <h2 className="text-base font-black text-slate-800">移动{moveDialog.type === 'group' ? '作品组' : '作品'}</h2>
+          <form onSubmit={handleSubmitMove} className="mt-4 space-y-4">
+            <label className="block">
+              <span className="mb-1.5 ml-1 block text-xs font-black text-slate-500">目标作品组</span>
+              <select
+                value={moveTargetId}
+                onChange={(e) => setMoveTargetId(e.target.value)}
+                className="block w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                disabled={moveSaving}
+              >
+                <option value="">根作品组</option>
+                {allProjectGroups
+                  .filter((group) => moveDialog.type !== 'group' || Number(group.id) !== Number(moveDialog.item.id))
+                  .map((group) => (
+                    <option key={group.id} value={group.id}>{buildGroupPath(group)}</option>
+                  ))}
+              </select>
+            </label>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={closeMoveDialog}
+                className="rounded-2xl border-2 border-slate-200 bg-slate-100 px-5 py-2.5 text-sm font-black text-slate-500 transition hover:bg-slate-200"
+                disabled={moveSaving}
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                className="rounded-2xl border-b-4 border-indigo-600 bg-indigo-400 px-5 py-2.5 text-sm font-black text-white shadow-sm transition-all active:translate-y-1 active:border-b-0 disabled:opacity-50"
+                disabled={moveSaving}
+              >
+                {moveSaving ? '移动中...' : '确认移动'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-indigo-50 to-pink-100 text-slate-800 flex flex-col font-sans">
       
       {/* 顶部全局导航栏 */}
@@ -643,7 +813,7 @@ const Dashboard = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projectGroups.map((group) => (
+            {projectGroups.map((group, index) => (
               <div
                 key={`group-${group.id}`}
                 onClick={() => setCurrentGroupId(group.id)}
@@ -661,6 +831,29 @@ const Dashboard = () => {
 
                     {selectedStudentId === 'me' && (
                       <div className="flex items-center space-x-1 shrink-0">
+                        <button
+                          onClick={(e) => handleReorderGroup(e, index, -1)}
+                          disabled={index === 0}
+                          className="text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 p-1.5 rounded-xl transition duration-150 disabled:opacity-30"
+                          title="上移作品组"
+                        >
+                          <ArrowUp className="w-4.5 h-4.5" />
+                        </button>
+                        <button
+                          onClick={(e) => handleReorderGroup(e, index, 1)}
+                          disabled={index === projectGroups.length - 1}
+                          className="text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 p-1.5 rounded-xl transition duration-150 disabled:opacity-30"
+                          title="下移作品组"
+                        >
+                          <ArrowDown className="w-4.5 h-4.5" />
+                        </button>
+                        <button
+                          onClick={(e) => handleOpenMoveDialog(e, 'group', group)}
+                          className="text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-xl transition duration-150"
+                          title="移动作品组"
+                        >
+                          <MoveRight className="w-4.5 h-4.5" />
+                        </button>
                         <button
                           onClick={(e) => handleRenameGroup(e, group)}
                           className="text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 p-1.5 rounded-xl transition duration-150"
@@ -724,6 +917,29 @@ const Dashboard = () => {
                       {/* 操作按钮区（仅在看自己的项目时显示，防止老师误修改或误删学生作品） */}
                       {selectedStudentId === 'me' && (
                         <div className="flex items-center space-x-1 shrink-0">
+                          <button
+                            onClick={(e) => handleReorderProject(e, index, -1)}
+                            disabled={index === 0}
+                            className="text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 p-1.5 rounded-xl transition duration-150 disabled:opacity-30"
+                            title="上移作品"
+                          >
+                            <ArrowUp className="w-4.5 h-4.5" />
+                          </button>
+                          <button
+                            onClick={(e) => handleReorderProject(e, index, 1)}
+                            disabled={index === projects.length - 1}
+                            className="text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 p-1.5 rounded-xl transition duration-150 disabled:opacity-30"
+                            title="下移作品"
+                          >
+                            <ArrowDown className="w-4.5 h-4.5" />
+                          </button>
+                          <button
+                            onClick={(e) => handleOpenMoveDialog(e, 'project', project)}
+                            className="text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-xl transition duration-150"
+                            title="移动作品"
+                          >
+                            <MoveRight className="w-4.5 h-4.5" />
+                          </button>
                           {/* 编辑名称画笔按钮 */}
                           <button
                             onClick={(e) => handleRenameProject(e, project.id, project.name)}
