@@ -1,24 +1,24 @@
 const db = require('../config/db');
 
-const canAccessAllProjects = (user) => user.role === 'admin';
+const canAccessAllProjects = () => false;
 
 exports.getConnection = () => db.getConnection();
 
-exports.listForUser = async (userId) => {
+exports.listForUser = async (userId, parentId = null) => {
   const [rows] = await db.query(
-    'SELECT id, name, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC',
-    [userId]
+    `SELECT id, name, parent_id, sort_order, created_at, updated_at FROM projects WHERE user_id = ? AND ${parentId === null ? 'parent_id IS NULL' : 'parent_id = ?'} ORDER BY sort_order ASC, updated_at DESC`,
+    parentId === null ? [userId] : [userId, parentId]
   );
   return rows;
 };
 
-exports.listVisibleToUser = async ({ currentUser, studentId }) => {
+exports.listVisibleToUser = async ({ currentUser, studentId, parentId = null }) => {
   if (!studentId) {
-    return exports.listForUser(currentUser.id);
+    return exports.listForUser(currentUser.id, parentId);
   }
 
   if (canAccessAllProjects(currentUser)) {
-    return exports.listForUser(studentId);
+    return exports.listForUser(studentId, parentId);
   }
 
   if (currentUser.role !== 'teacher') {
@@ -30,9 +30,9 @@ exports.listVisibleToUser = async ({ currentUser, studentId }) => {
      FROM projects p
      JOIN users u ON p.user_id = u.id
      JOIN classes c ON u.class_code = c.class_code
-     WHERE p.user_id = ? AND u.role = "student" AND c.teacher_user_id = ?
-     ORDER BY p.updated_at DESC`,
-    [studentId, currentUser.id]
+     WHERE p.user_id = ? AND u.role = "student" AND c.teacher_user_id = ? AND ${parentId === null ? 'p.parent_id IS NULL' : 'p.parent_id = ?'}
+     ORDER BY p.sort_order ASC, p.updated_at DESC`,
+    parentId === null ? [studentId, currentUser.id] : [studentId, currentUser.id, parentId]
   );
   return rows;
 };
@@ -61,10 +61,10 @@ const findTeacherAccessibleProjectWithOwnerById = async (projectId, user) => {
   return rows[0] || null;
 };
 
-exports.createWithConnection = async (connection, { id, userId, name }) => {
+exports.createWithConnection = async (connection, { id, userId, name, parentId = null, sortOrder = 0 }) => {
   await connection.query(
-    'INSERT INTO projects (id, user_id, name) VALUES (?, ?, ?)',
-    [id, userId, name]
+    'INSERT INTO projects (id, user_id, name, parent_id, sort_order) VALUES (?, ?, ?, ?, ?)',
+    [id, userId, name, parentId, sortOrder]
   );
 };
 
@@ -143,6 +143,14 @@ exports.updateName = async ({ projectId, userId, name }) => {
   const [result] = await db.query(
     'UPDATE projects SET name = ? WHERE id = ? AND user_id = ?',
     [name, projectId, userId]
+  );
+  return result.affectedRows;
+};
+
+exports.clearParentId = async ({ userId, parentId }) => {
+  const [result] = await db.query(
+    'UPDATE projects SET parent_id = NULL WHERE user_id = ? AND parent_id = ?',
+    [userId, parentId]
   );
   return result.affectedRows;
 };

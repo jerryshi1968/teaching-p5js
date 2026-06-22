@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Folder, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy, ShieldCheck } from 'lucide-react';
 // 导入网络请求工具
-import { fetchMyProjects, copyProject, fetchMyClasses, fetchStudentsByClass } from '../services/api';
+import { fetchMyProjects, copyProject, fetchMyClasses, fetchStudentsByClass, fetchProjectGroups, createProjectGroup, updateProjectGroup, deleteProjectGroup } from '../services/api';
 import { useAppDialog } from '../hooks/useAppDialog';
 import ProfileDialog from '../components/Common/ProfileDialog';
 
@@ -13,6 +13,9 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const appDialog = useAppDialog();
   const [projects, setProjects] = useState([]);
+  const [projectGroups, setProjectGroups] = useState([]);
+  const [breadcrumbs, setBreadcrumbs] = useState([]);
+  const [currentGroupId, setCurrentGroupId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
@@ -49,6 +52,10 @@ const Dashboard = () => {
 
   const findSelectedStudent = () => students.find(s => String(s.id) === String(selectedStudentId));
   const findSelectedClass = () => teacherClasses.find(c => String(c.class_code) === String(selectedClassCode));
+  const handleStudentChange = (studentId) => {
+    setCurrentGroupId(null);
+    setSelectedStudentId(studentId);
+  };
 
   // 1. 初始化：获取用户信息
   useEffect(() => {
@@ -123,6 +130,7 @@ const Dashboard = () => {
   }, [currentUser, selectedClassCode]);
 
   const handleClassChange = (classCode) => {
+    setCurrentGroupId(null);
     setSelectedClassCode(classCode);
     setSelectedStudentId('me');
     localStorage.setItem(DASHBOARD_SELECTED_STUDENT_KEY, 'me');
@@ -148,16 +156,25 @@ const Dashboard = () => {
     // 如果选中的是 'me'，传入 null（拉取自己的项目）；否则传入具体的学生 ID
     const targetStudentId = selectedStudentId === 'me' ? null : selectedStudentId;
 
-    fetchMyProjects(targetStudentId)
-      .then(data => {
-        if (data) setProjects(data);
+    Promise.all([
+      fetchMyProjects(targetStudentId, currentGroupId),
+      fetchProjectGroups({ studentId: targetStudentId, parentId: currentGroupId })
+    ])
+      .then(([projectData, groupData]) => {
+        if (projectData) setProjects(projectData);
+        if (groupData) {
+          setProjectGroups(Array.isArray(groupData.groups) ? groupData.groups : []);
+          setBreadcrumbs(Array.isArray(groupData.breadcrumbs) ? groupData.breadcrumbs : []);
+        }
         setLoading(false);
       })
       .catch(err => {
         console.error('拉取项目列表失败', err);
+        setProjectGroups([]);
+        setBreadcrumbs([]);
         setLoading(false);
       });
-  }, [selectedStudentId, currentUser, studentsLoaded]);
+  }, [selectedStudentId, currentUser, studentsLoaded, currentGroupId]);
 
   // 3. 创建新项目逻辑
   const handleCreateProject = async () => {
@@ -178,7 +195,7 @@ const Dashboard = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ name: projectName })
+        body: JSON.stringify({ name: projectName, parentId: currentGroupId })
       });
 
       const data = await response.json();
@@ -189,6 +206,79 @@ const Dashboard = () => {
     } catch (err) {
       await appDialog.alert({
         title: '创建失败',
+        message: err.message
+      });
+    }
+  };
+
+  const handleCreateGroup = async () => {
+    const groupName = await appDialog.prompt({
+      title: '创建作品组',
+      message: '给这个作品组起个清楚的名字吧。',
+      defaultValue: '新的作品组',
+      placeholder: '请输入作品组名称',
+      confirmText: '创建作品组'
+    });
+    if (!groupName || !groupName.trim()) return;
+
+    try {
+      setLoading(true);
+      await createProjectGroup({ name: groupName.trim(), parentId: currentGroupId });
+      const groupData = await fetchProjectGroups({ parentId: currentGroupId });
+      if (groupData) {
+        setProjectGroups(Array.isArray(groupData.groups) ? groupData.groups : []);
+        setBreadcrumbs(Array.isArray(groupData.breadcrumbs) ? groupData.breadcrumbs : []);
+      }
+    } catch (err) {
+      await appDialog.alert({
+        title: '创建失败',
+        message: err.message
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRenameGroup = async (e, group) => {
+    e.stopPropagation();
+    const groupName = await appDialog.prompt({
+      title: '修改作品组名称',
+      message: '请输入新的作品组名称。',
+      defaultValue: group.name,
+      placeholder: '请输入作品组名称',
+      confirmText: '保存名称'
+    });
+    if (!groupName || !groupName.trim() || groupName === group.name) return;
+
+    try {
+      await updateProjectGroup(group.id, { name: groupName.trim() });
+      setProjectGroups((currentGroups) => currentGroups.map((item) => (
+        item.id === group.id ? { ...item, name: groupName.trim() } : item
+      )));
+    } catch (err) {
+      await appDialog.alert({
+        title: '重命名失败',
+        message: err.message
+      });
+    }
+  };
+
+  const handleDeleteGroup = async (e, group) => {
+    e.stopPropagation();
+    const confirmed = await appDialog.confirm({
+      title: '删除作品组',
+      message: `确定要删除作品组「${group.name}」吗？只有空作品组可以删除。`,
+      confirmText: '删除作品组',
+      tone: 'danger'
+    });
+    if (!confirmed) return;
+
+    try {
+      await deleteProjectGroup(group.id);
+      setProjectGroups((currentGroups) => currentGroups.filter((item) => item.id !== group.id));
+    } catch (err) {
+      await appDialog.alert({
+        title: '删除失败',
         message: err.message
       });
     }
@@ -279,6 +369,7 @@ const Dashboard = () => {
       await copyProject(project.id);
       const myProjects = await fetchMyProjects();
       if (myProjects) setProjects(myProjects);
+      setCurrentGroupId(null);
       setSelectedStudentId('me');
     } catch (err) {
       await appDialog.alert({
@@ -423,7 +514,7 @@ const Dashboard = () => {
                 <div className="flex flex-wrap gap-2.5">
                   {/* “我”的选项卡 */}
                   <button
-                    onClick={() => setSelectedStudentId('me')}
+                    onClick={() => handleStudentChange('me')}
                     className={`px-4 py-2 rounded-2xl text-xs font-black border-2 transition-all transform active:translate-y-0.5 ${
                       selectedStudentId === 'me'
                         ? 'bg-indigo-400 border-indigo-500 text-white shadow-md'
@@ -437,7 +528,7 @@ const Dashboard = () => {
                   {students.map((student) => (
                     <button
                       key={student.id}
-                      onClick={() => setSelectedStudentId(String(student.id))}
+                      onClick={() => handleStudentChange(String(student.id))}
                       className={`px-4 py-2 rounded-2xl text-xs font-black border-2 transition-all transform active:translate-y-0.5 ${
                       String(selectedStudentId) === String(student.id)
                           ? 'bg-indigo-400 border-indigo-500 text-white shadow-md'
@@ -474,14 +565,53 @@ const Dashboard = () => {
           
           {/* 3D 新建项目按钮（仅在看自己的项目时显示，防止老师去给学生建项目） */}
           {selectedStudentId === 'me' && (
-            <button
-              onClick={handleCreateProject}
-              className="flex items-center space-x-2 bg-amber-400 hover:bg-amber-300 text-amber-950 px-5 py-3 rounded-2xl font-black transition-all transform active:translate-y-1 active:border-b-0 border-b-4 border-amber-600 shadow-[0_4px_8px_rgba(0,0,0,0.05)] text-sm"
-            >
-              <Plus className="w-5 h-5 stroke-[3px]" />
-              <span>动手做个新作品</span>
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={handleCreateGroup}
+                className="flex items-center space-x-2 bg-white hover:bg-indigo-50 text-indigo-700 px-5 py-3 rounded-2xl font-black transition-all transform active:translate-y-1 border-2 border-indigo-200 shadow-[0_4px_8px_rgba(0,0,0,0.03)] text-sm"
+              >
+                <Folder className="w-5 h-5 stroke-[3px]" />
+                <span>新建作品组</span>
+              </button>
+              <button
+                onClick={handleCreateProject}
+                className="flex items-center space-x-2 bg-amber-400 hover:bg-amber-300 text-amber-950 px-5 py-3 rounded-2xl font-black transition-all transform active:translate-y-1 active:border-b-0 border-b-4 border-amber-600 shadow-[0_4px_8px_rgba(0,0,0,0.05)] text-sm"
+              >
+                <Plus className="w-5 h-5 stroke-[3px]" />
+                <span>动手做个新作品</span>
+              </button>
+            </div>
           )}
+        </div>
+
+        <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-black text-slate-500">
+          <button
+            type="button"
+            onClick={() => setCurrentGroupId(null)}
+            className={`rounded-full px-3 py-1.5 transition ${
+              currentGroupId === null
+                ? 'bg-indigo-400 text-white'
+                : 'bg-white/80 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'
+            }`}
+          >
+            根作品组
+          </button>
+          {breadcrumbs.map((group) => (
+            <React.Fragment key={group.id}>
+              <span className="text-slate-300">/</span>
+              <button
+                type="button"
+                onClick={() => setCurrentGroupId(group.id)}
+                className={`rounded-full px-3 py-1.5 transition ${
+                  Number(currentGroupId) === Number(group.id)
+                    ? 'bg-indigo-400 text-white'
+                    : 'bg-white/80 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'
+                }`}
+              >
+                {group.name}
+              </button>
+            </React.Fragment>
+          ))}
         </div>
 
         {/* 项目列表渲染 */}
@@ -490,7 +620,7 @@ const Dashboard = () => {
             <div className="w-10 h-10 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
             <span>正在召唤作品集，请稍候...</span>
           </div>
-        ) : projects.length === 0 ? (
+        ) : projectGroups.length === 0 && projects.length === 0 ? (
           // 空状态 - 卡通绘本手绘框样式
           <div className="text-center py-20 border-4 border-dashed border-slate-300 rounded-[2.5rem] bg-white/70 shadow-inner max-w-lg mx-auto">
             <div className="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-indigo-200">
@@ -513,6 +643,52 @@ const Dashboard = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {projectGroups.map((group) => (
+              <div
+                key={`group-${group.id}`}
+                onClick={() => setCurrentGroupId(group.id)}
+                className="bg-white border-4 border-indigo-200 bg-indigo-50/40 hover:-translate-y-1.5 rounded-[2rem] p-5 cursor-pointer transition-all duration-300 flex flex-col justify-between group h-44 shadow-sm hover:shadow-[0_12px_24px_rgba(0,0,0,0.06)] relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-14 h-14 pointer-events-none opacity-20">
+                  <Folder className="w-full h-full text-indigo-400 fill-current translate-x-3 -translate-y-3" />
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-start">
+                    <h3 className="font-black text-base text-indigo-700 truncate w-4/5">
+                      📁 {group.name}
+                    </h3>
+
+                    {selectedStudentId === 'me' && (
+                      <div className="flex items-center space-x-1 shrink-0">
+                        <button
+                          onClick={(e) => handleRenameGroup(e, group)}
+                          className="text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 p-1.5 rounded-xl transition duration-150"
+                          title="修改作品组名称"
+                        >
+                          <Pencil className="w-4.5 h-4.5" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteGroup(e, group)}
+                          className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-1.5 rounded-xl transition duration-150"
+                          title="删除作品组"
+                        >
+                          <Trash2 className="w-4.5 h-4.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 font-mono tracking-wider">作品组编号: {group.id}</p>
+                </div>
+
+                <div className="flex justify-between items-center mt-4 border-t-2 border-indigo-100 pt-3 text-[11px] font-bold text-slate-400">
+                  <span>点击进入作品组</span>
+                  <span className="px-3 py-1 rounded-full text-[10px] font-black border bg-indigo-100 text-indigo-700 border-indigo-200">
+                    文件夹
+                  </span>
+                </div>
+              </div>
+            ))}
             {projects.map((project, index) => {
               // 为当前卡片挑选一套专属的主题样式
               const style = cardStyles[index % cardStyles.length];

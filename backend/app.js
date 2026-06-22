@@ -41,6 +41,7 @@ app.get('/api/health', async (req, res) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/projects', require('./routes/projects'));
+app.use('/api/project-groups', require('./routes/projectGroups'));
 app.use('/api/files', require('./routes/files'));
 
 // 4. 全局错误捕获中间件

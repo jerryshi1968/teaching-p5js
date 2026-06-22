@@ -5,8 +5,16 @@ export const getAuthHeader = () => {
 };
 
 // 示例：向后端拉取项目列表的方法
-export const fetchMyProjects = async (studentId = null) => {
-  const url = studentId ? `/api/projects?studentId=${studentId}` : '/api/projects';
+export const fetchMyProjects = async (studentId = null, parentId = null) => {
+  const params = new URLSearchParams();
+  if (studentId) {
+    params.set('studentId', studentId);
+  }
+  if (parentId !== null && parentId !== undefined) {
+    params.set('parentId', String(parentId));
+  }
+  const query = params.toString();
+  const url = query ? `/api/projects?${query}` : '/api/projects';
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -21,6 +29,74 @@ export const fetchMyProjects = async (studentId = null) => {
     return null;
   }
   return response.json();
+};
+
+export const fetchProjectGroups = async ({ studentId = null, parentId = null } = {}) => {
+  const params = new URLSearchParams();
+  if (studentId) {
+    params.set('studentId', studentId);
+  }
+  if (parentId !== null && parentId !== undefined) {
+    params.set('parentId', String(parentId));
+  }
+  const query = params.toString();
+  const response = await fetch(`/api/project-groups${query ? `?${query}` : ''}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    }
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    localStorage.removeItem('teaching_token');
+    localStorage.removeItem('teaching_user');
+    window.location.href = '/login';
+    return null;
+  }
+  if (!response.ok) throw new Error(data?.message || `获取作品组失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const createProjectGroup = async ({ name, parentId = null }) => {
+  const response = await fetch('/api/project-groups', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify({ name, parentId })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || `创建作品组失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const updateProjectGroup = async (groupId, { name }) => {
+  const response = await fetch(`/api/project-groups/${groupId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify({ name })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || `修改作品组失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const deleteProjectGroup = async (groupId) => {
+  const response = await fetch(`/api/project-groups/${groupId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    }
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || `删除作品组失败（HTTP ${response.status}），请重试。`);
+  return data;
 };
 
 export const fetchAdminUsers = async (page = 1, pageSize = 10, username = '') => {

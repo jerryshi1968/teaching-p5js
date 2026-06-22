@@ -2,6 +2,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
 const Project = require('../models/projectModel');
+const ProjectGroup = require('../models/projectGroupModel');
 const File = require('../models/fileModel');
 
 const PROJECTS_BASE_DIR = path.resolve(__dirname, '../storage/projects');
@@ -36,11 +37,23 @@ canvas {
 }`
 };
 
+const normalizeParentId = (value) => {
+  if (value === undefined || value === null || value === '' || value === 'null') return null;
+  const parentId = Number.parseInt(value, 10);
+  return Number.isFinite(parentId) && parentId > 0 ? parentId : NaN;
+};
+
 exports.listProjects = async (req, res, next) => {
   try {
+    const parentId = normalizeParentId(req.query.parentId);
+    if (Number.isNaN(parentId)) {
+      return res.status(400).json({ message: '作品组 ID 不正确。' });
+    }
+
     const projects = await Project.listVisibleToUser({
       currentUser: req.user,
-      studentId: req.query.studentId
+      studentId: req.query.studentId,
+      parentId
     });
 
     if (!projects) {
@@ -61,13 +74,28 @@ exports.createProject = async (req, res, next) => {
 
     const userId = req.user.id;
     const { name } = req.body;
+    const parentId = normalizeParentId(req.body.parentId);
     const projectName = name || '未命名项目';
     const projectId = crypto.randomUUID();
+
+    if (Number.isNaN(parentId)) {
+      await connection.rollback();
+      return res.status(400).json({ message: '作品组 ID 不正确。' });
+    }
+
+    if (parentId !== null) {
+      const parentGroup = await ProjectGroup.findOwnedById({ id: parentId, userId });
+      if (!parentGroup) {
+        await connection.rollback();
+        return res.status(404).json({ message: '作品组不存在或无权访问。' });
+      }
+    }
 
     await Project.createWithConnection(connection, {
       id: projectId,
       userId,
-      name: projectName
+      name: projectName,
+      parentId
     });
 
     const projectFolder = path.join(PROJECTS_BASE_DIR, projectId);
