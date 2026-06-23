@@ -2,9 +2,11 @@ const db = require('../config/db');
 
 exports.listClassesPaginated = async ({ limit, offset }) => {
   const [rows] = await db.query(
-    `SELECT c.id, c.name, c.class_code, c.teacher_user_id, u.username AS teacher_name, c.created_at, c.updated_at
+    `SELECT c.id, c.name, c.class_code, c.teacher_user_id, u.username AS teacher_name, COUNT(s.id) AS student_count, c.created_at, c.updated_at
      FROM classes c
      JOIN users u ON c.teacher_user_id = u.id
+     LEFT JOIN users s ON s.class_code = c.class_code AND s.role = "student"
+     GROUP BY c.id, c.name, c.class_code, c.teacher_user_id, u.username, c.created_at, c.updated_at
      ORDER BY c.created_at DESC, c.id DESC
      LIMIT ? OFFSET ?`,
     [limit, offset]
@@ -57,6 +59,18 @@ exports.findByTeacherAndCode = async ({ teacherUserId, classCode }) => {
     [teacherUserId, classCode]
   );
   return rows[0] || null;
+};
+
+exports.listStudentsByClassId = async (id) => {
+  const [rows] = await db.query(
+    `SELECT u.id, u.username, u.phone, u.gender, DATE_FORMAT(u.birthday, "%Y-%m-%d") AS birthday, u.created_at
+     FROM users u
+     JOIN classes c ON u.class_code = c.class_code
+     WHERE c.id = ? AND u.role = "student"
+     ORDER BY u.created_at DESC, u.id DESC`,
+    [id]
+  );
+  return rows;
 };
 
 exports.create = async ({ name, classCode, teacherUserId }) => {

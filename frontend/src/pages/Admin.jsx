@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Edit2, Plus, Save, School, Trash2, Users, X } from 'lucide-react';
-import { createAdminClass, deleteAdminClass, fetchAdminClasses, fetchAdminTeachers, fetchAdminUsers, updateAdminClass, updateAdminUserRole } from '../services/api';
+import { createAdminClass, deleteAdminClass, fetchAdminClasses, fetchAdminClassStudents, fetchAdminTeachers, fetchAdminUsers, updateAdminClass, updateAdminUserRole } from '../services/api';
 
 const PAGE_SIZE = 10;
 
@@ -29,6 +29,10 @@ const Admin = () => {
   const [classForm, setClassForm] = useState({ name: '', classCode: '', teacherUserId: '' });
   const [classSaving, setClassSaving] = useState(false);
   const [classDeletingId, setClassDeletingId] = useState(null);
+  const [classStudentsDialog, setClassStudentsDialog] = useState(null);
+  const [classStudents, setClassStudents] = useState([]);
+  const [classStudentsLoading, setClassStudentsLoading] = useState(false);
+  const [classStudentsError, setClassStudentsError] = useState('');
 
   const currentUser = useMemo(() => {
     const userJson = localStorage.getItem('teaching_user');
@@ -245,6 +249,28 @@ const Admin = () => {
     }
   };
 
+  const openClassStudentsDialog = async (classItem) => {
+    setClassStudentsDialog(classItem);
+    setClassStudents([]);
+    setClassStudentsError('');
+    setClassStudentsLoading(true);
+
+    try {
+      const data = await fetchAdminClassStudents(classItem.id);
+      setClassStudents(Array.isArray(data.students) ? data.students : []);
+    } catch (err) {
+      setClassStudentsError(err.message || '获取班级学生列表失败，请重试。');
+    } finally {
+      setClassStudentsLoading(false);
+    }
+  };
+
+  const closeClassStudentsDialog = () => {
+    setClassStudentsDialog(null);
+    setClassStudents([]);
+    setClassStudentsError('');
+  };
+
   const formatDateTime = (value) => {
     if (!value) return '-';
     const date = new Date(value);
@@ -458,8 +484,8 @@ const Admin = () => {
                       <th className="px-4 py-3 text-left font-black">班级名称</th>
                       <th className="px-4 py-3 text-left font-black">班级码</th>
                       <th className="px-4 py-3 text-left font-black">教师</th>
+                      <th className="px-4 py-3 text-left font-black">班级人数</th>
                       <th className="px-4 py-3 text-left font-black">创建时间</th>
-                      <th className="px-4 py-3 text-left font-black">更新时间</th>
                       <th className="px-4 py-3 text-right font-black">操作</th>
                     </tr>
                   </thead>
@@ -482,8 +508,16 @@ const Admin = () => {
                           <td className="px-4 py-3 font-bold text-slate-800">{classItem.name || '-'}</td>
                           <td className="px-4 py-3 text-slate-600">{classItem.class_code || '-'}</td>
                           <td className="px-4 py-3 text-slate-600">{classItem.teacher_name || '-'}</td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => openClassStudentsDialog(classItem)}
+                              className="rounded-lg bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
+                            >
+                              {Number(classItem.student_count || 0)} 人
+                            </button>
+                          </td>
                           <td className="px-4 py-3 text-slate-600">{formatDateTime(classItem.created_at)}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatDateTime(classItem.updated_at)}</td>
                           <td className="px-4 py-3">
                             <div className="flex justify-end gap-2">
                               <button
@@ -539,6 +573,66 @@ const Admin = () => {
           )}
         </section>
       </main>
+
+      {classStudentsDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-5xl rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h3 className="text-base font-black text-slate-900">{classStudentsDialog.name} 学生列表</h3>
+                <p className="mt-1 text-xs font-bold text-slate-400">班级码：{classStudentsDialog.class_code || '-'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeClassStudentsDialog}
+                className="w-9 h-9 rounded-lg inline-flex items-center justify-center text-slate-500 transition hover:bg-slate-100"
+                title="关闭"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-auto p-5">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-100 text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-black">用户名</th>
+                    <th className="px-4 py-3 text-left font-black">手机号</th>
+                    <th className="px-4 py-3 text-left font-black">性别</th>
+                    <th className="px-4 py-3 text-left font-black">生日</th>
+                    <th className="px-4 py-3 text-left font-black">创建时间</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {classStudentsLoading ? (
+                    <tr>
+                      <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="5">加载中...</td>
+                    </tr>
+                  ) : classStudentsError ? (
+                    <tr>
+                      <td className="px-4 py-10 text-center text-rose-500 font-bold" colSpan="5">{classStudentsError}</td>
+                    </tr>
+                  ) : classStudents.length === 0 ? (
+                    <tr>
+                      <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="5">暂无学生</td>
+                    </tr>
+                  ) : (
+                    classStudents.map((student) => (
+                      <tr key={student.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 font-bold text-slate-800">{student.username || '-'}</td>
+                        <td className="px-4 py-3 text-slate-600">{student.phone || '-'}</td>
+                        <td className="px-4 py-3 text-slate-600">{formatGender(student.gender)}</td>
+                        <td className="px-4 py-3 text-slate-600">{formatDate(student.birthday)}</td>
+                        <td className="px-4 py-3 text-slate-600">{formatDateTime(student.created_at)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {classDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">

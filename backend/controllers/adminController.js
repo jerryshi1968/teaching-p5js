@@ -136,6 +136,28 @@ exports.listClasses = async (req, res, next) => {
   }
 };
 
+exports.listClassStudents = async (req, res, next) => {
+  try {
+    const classId = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(classId) || classId <= 0) {
+      return res.status(400).json({ message: '班级 ID 不正确。' });
+    }
+
+    const currentClass = await Class.findById(classId);
+    if (!currentClass) {
+      return res.status(404).json({ message: '班级不存在。' });
+    }
+
+    const students = await Class.listStudentsByClassId(classId);
+    res.json({
+      class: currentClass,
+      students
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.createClass = async (req, res, next) => {
   try {
     const payload = normalizeClassPayload(req.body);

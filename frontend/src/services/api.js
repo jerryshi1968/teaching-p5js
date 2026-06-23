@@ -278,6 +278,22 @@ export const fetchAdminClasses = async (page = 1, pageSize = 10) => {
   return data;
 };
 
+export const fetchAdminClassStudents = async (classId) => {
+  const response = await fetch(`/api/admin/classes/${classId}/students`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    }
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权访问班级学生列表。');
+  }
+  if (!response.ok) throw new Error(data?.message || `获取班级学生列表失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
 export const createAdminClass = async (payload) => {
   const response = await fetch('/api/admin/classes', {
     method: 'POST',
