@@ -7,6 +7,8 @@ import FileTree from '../components/Workspace/FileTree';
 import { useAppDialog } from '../hooks/useAppDialog';
 
 const TEXT_EXTENSIONS = ['.html', '.htm', '.css', '.js', '.txt'];
+const CODE_FONT_SIZE_KEY = 'teaching_editor_code_font_size';
+const CODE_FONT_SIZES = ['small', 'medium', 'large'];
 
 const isEditableTextFile = (file) => file && !file.isDirectory && file.isText;
 
@@ -41,6 +43,10 @@ const EditorView = () => {
   const [projectName, setProjectName] = useState('加载中...');
   const [canEdit, setCanEdit] = useState(false);
   const [coords, setCoords] = useState(null);
+  const [codeFontSize, setCodeFontSize] = useState(() => {
+    const savedSize = localStorage.getItem(CODE_FONT_SIZE_KEY);
+    return CODE_FONT_SIZES.includes(savedSize) ? savedSize : 'medium';
+  });
 
   const activeFile = useMemo(
     () => files.find((file) => file.id === activeFileId) || null,
@@ -48,6 +54,13 @@ const EditorView = () => {
   );
 
   const token = localStorage.getItem('teaching_token');
+
+  const handleCodeFontSizeChange = (nextSize) => {
+    if (!CODE_FONT_SIZES.includes(nextSize)) return;
+
+    setCodeFontSize(nextSize);
+    localStorage.setItem(CODE_FONT_SIZE_KEY, nextSize);
+  };
 
   const getProjectPreviewUrl = () => (
     `/teaching-p5js/projects/${encodeURIComponent(projectId)}/index.html?t=${Date.now()}`
@@ -505,6 +518,8 @@ const EditorView = () => {
                 value={activeFile.content || ''}
                 onChange={handleCodeChange}
                 readOnly={!canEdit}
+                fontSize={codeFontSize}
+                onFontSizeChange={handleCodeFontSizeChange}
               />
             ) : (
               <div className="h-full w-full bg-slate-950 text-slate-300 flex items-center justify-center p-6 text-center">
