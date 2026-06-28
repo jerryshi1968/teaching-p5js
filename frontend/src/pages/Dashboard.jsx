@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowDown, ArrowUp, Folder, MoveRight, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy, ShieldCheck } from 'lucide-react';
 // 导入网络请求工具
 import { fetchMyProjects, copyProject, fetchMyClasses, fetchStudentsByClass, fetchProjectGroups, fetchAllProjectGroups, createProjectGroup, updateProjectGroup, moveProjectGroup, reorderProjectGroups, deleteProjectGroup, moveProject, reorderProjects } from '../services/api';
@@ -8,14 +8,22 @@ import ProfileDialog from '../components/Common/ProfileDialog';
 
 const DASHBOARD_SELECTED_CLASS_KEY = 'teaching_dashboard_selected_class_code';
 const DASHBOARD_SELECTED_STUDENT_KEY = 'teaching_dashboard_selected_student_id';
+const DASHBOARD_CURRENT_GROUP_KEY = 'teaching_dashboard_current_group_id';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const appDialog = useAppDialog();
   const [projects, setProjects] = useState([]);
   const [projectGroups, setProjectGroups] = useState([]);
   const [breadcrumbs, setBreadcrumbs] = useState([]);
-  const [currentGroupId, setCurrentGroupId] = useState(null);
+  const [currentGroupId, setCurrentGroupId] = useState(() => {
+    const stateGroupId = location.state?.dashboardGroupId;
+    if (stateGroupId !== undefined) return stateGroupId;
+
+    const savedGroupId = sessionStorage.getItem(DASHBOARD_CURRENT_GROUP_KEY);
+    return savedGroupId ? Number(savedGroupId) : null;
+  });
   const [allProjectGroups, setAllProjectGroups] = useState([]);
   const [moveDialog, setMoveDialog] = useState(null);
   const [moveTargetId, setMoveTargetId] = useState('');
@@ -131,6 +139,14 @@ const Dashboard = () => {
   }, [selectedStudentId]);
 
   useEffect(() => {
+    if (currentGroupId === null || currentGroupId === undefined) {
+      sessionStorage.removeItem(DASHBOARD_CURRENT_GROUP_KEY);
+    } else {
+      sessionStorage.setItem(DASHBOARD_CURRENT_GROUP_KEY, String(currentGroupId));
+    }
+  }, [currentGroupId]);
+
+  useEffect(() => {
     if (!currentUser || currentUser.role !== 'teacher') return;
 
     if (!selectedClassCode) {
@@ -234,7 +250,7 @@ const Dashboard = () => {
       if (!response.ok) throw new Error(data.message || '新建项目失败了，请重试哦！');
 
       // 创建成功后，直接重定向至新项目编辑器
-      navigate(`/editor/${data.id}`);
+      navigate(`/editor/${data.id}`, { state: { dashboardGroupId: currentGroupId } });
     } catch (err) {
       await appDialog.alert({
         title: '创建失败',
@@ -888,7 +904,7 @@ const Dashboard = () => {
               return (
                 <div
                   key={project.id}
-                  onClick={() => navigate(`/editor/${project.id}`)}
+                  onClick={() => navigate(`/editor/${project.id}`, { state: { dashboardGroupId: currentGroupId } })}
                   className={`bg-white border-4 ${style.border} ${style.bg} hover:-translate-y-1.5 rounded-[2rem] p-5 cursor-pointer transition-all duration-300 flex flex-col justify-between group h-44 shadow-sm hover:shadow-[0_12px_24px_rgba(0,0,0,0.06)] relative overflow-hidden`}
                 >
                   {/* 右上角斜挎装饰，像一个小书签 */}

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import Split from 'react-split';
 import { ChevronLeft, ExternalLink, Play, Save, Sparkles, Wand2 } from 'lucide-react';
 import CodeEditor from '../components/Workspace/CodeEditor';
@@ -32,8 +32,10 @@ const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
 const EditorView = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const appDialog = useAppDialog();
   const iframeRef = useRef(null);
+  const dashboardGroupId = location.state?.dashboardGroupId ?? null;
 
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +62,10 @@ const EditorView = () => {
 
     setCodeFontSize(nextSize);
     localStorage.setItem(CODE_FONT_SIZE_KEY, nextSize);
+  };
+
+  const handleBackToDashboard = () => {
+    navigate('/dashboard', { state: { dashboardGroupId } });
   };
 
   const getProjectPreviewUrl = () => (
@@ -124,7 +130,7 @@ const EditorView = () => {
           title: '加载失败',
           message: err.message
         });
-        navigate('/dashboard');
+        handleBackToDashboard();
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -454,7 +460,7 @@ const EditorView = () => {
         <div className="flex items-center space-x-4">
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
+            onClick={handleBackToDashboard}
             className="bg-slate-100 hover:bg-slate-200 p-2.5 rounded-2xl border-2 border-slate-200 text-slate-500 hover:text-slate-700 transition shadow-sm active:translate-y-0.5"
             title="返回我的工坊"
           >
