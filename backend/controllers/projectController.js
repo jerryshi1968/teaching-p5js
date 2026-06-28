@@ -26,7 +26,7 @@ const DEFAULT_TEMPLATES = {
 }
 
 function draw() {
-  circle(50, 50, 80, 80);
+  circle(50, 50, 80);
 }`,
   'style.css': `html, body {
   margin: 0;
