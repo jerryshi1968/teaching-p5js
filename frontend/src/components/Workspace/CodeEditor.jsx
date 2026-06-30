@@ -5,7 +5,7 @@ import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { EditorView } from '@codemirror/view';
-import { Check, Copy, Palette, X } from 'lucide-react';
+import { Check, Copy, HelpCircle, Palette, X } from 'lucide-react';
 
 const FONT_SIZE_MAP = {
   small: 14,
@@ -83,6 +83,10 @@ const CodeEditor = ({ value, onChange, fileName, readOnly = false, fontSize = 'm
     setColorPickerOpen(false);
   };
 
+  const handleOpenHelp = () => {
+    window.open('/teaching-p5js/help/', '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="h-full w-full overflow-hidden flex flex-col bg-[#1e1e1e]">
       {/* 编辑器顶栏（展示当前激活文件名） */}
@@ -118,6 +122,14 @@ const CodeEditor = ({ value, onChange, fileName, readOnly = false, fontSize = 'm
             </button>
           ))}
           </div>
+          <button
+            type="button"
+            onClick={handleOpenHelp}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#3c3c3c] bg-[#1e1e1e] text-gray-400 transition hover:bg-[#2d2d2d] hover:text-gray-100"
+            title="Help"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
         </div>
       </div>
       
