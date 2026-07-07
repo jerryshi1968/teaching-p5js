@@ -1,15 +1,19 @@
 import React, { useRef } from 'react';
 import {
+  Bot,
+  Check,
   FileCode2,
   FilePlus2,
   Folder,
   FolderPlus,
   Image,
+  Loader2,
   Music,
   Pencil,
   Trash2,
   Upload,
-  Video
+  Video,
+  X
 } from 'lucide-react';
 
 const getDepth = (filePath) => {
@@ -43,7 +47,15 @@ const FileTree = ({
   onCreateFolder,
   onUpload,
   onRename,
-  onDelete
+  onDelete,
+  aiMessages = [],
+  aiInput,
+  aiLoading,
+  aiPending,
+  onAiInputChange,
+  onAiSubmit,
+  onAiApply,
+  onAiCancel
 }) => {
   const inputRef = useRef(null);
 
@@ -66,6 +78,14 @@ const FileTree = ({
       onUpload(selectedFiles);
     }
     event.target.value = '';
+  };
+
+  const handleAiKeyDown = (event) => {
+    if (event.ctrlKey && event.key === 'Enter') {
+      event.preventDefault();
+      if (!canEdit || aiLoading || !aiInput.trim()) return;
+      onAiSubmit(event);
+    }
   };
 
   const toolButtonClass = 'p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed';
@@ -108,7 +128,7 @@ const FileTree = ({
         <input ref={inputRef} type="file" multiple className="hidden" onChange={handleUploadChange} />
       </div>
 
-      <div className="flex-1 py-2 overflow-y-auto">
+      <div className="h-[190px] py-2 overflow-y-auto border-b-2 border-slate-200/50">
         {sortedFiles.map((file) => {
           const isActive = activeFileId === file.id;
           const isProtected = file.path === './index.html';
@@ -155,6 +175,77 @@ const FileTree = ({
             </div>
           );
         })}
+      </div>
+
+      <div className="flex-1 min-h-0 flex flex-col bg-slate-50">
+        <div className="px-3 py-2 border-b border-slate-200/70 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-black text-slate-600">
+            <Bot className="w-4 h-4 text-indigo-500" />
+            <span>AI助手</span>
+          </div>
+          {aiPending && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={onAiApply}
+                disabled={!canEdit || aiLoading}
+                className="p-1 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="应用AI修改"
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={onAiCancel}
+                disabled={aiLoading}
+                className="p-1 rounded-md bg-rose-100 text-rose-700 hover:bg-rose-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="取消AI修改"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-2">
+          {aiMessages.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-center text-[11px] leading-5 font-bold text-slate-400 px-2">
+              输入想让 AI 修改的效果，确认后才会写入代码。
+            </div>
+          ) : (
+            aiMessages.map((message) => (
+              <div
+                key={message.id}
+                className={`rounded-lg border px-2.5 py-2 text-[11px] leading-5 font-bold whitespace-pre-wrap ${
+                  message.role === 'user'
+                    ? 'bg-indigo-50 border-indigo-100 text-indigo-900'
+                    : message.role === 'error'
+                      ? 'bg-rose-50 border-rose-100 text-rose-700'
+                      : 'bg-white border-slate-200 text-slate-600'
+                }`}
+              >
+                {message.content}
+              </div>
+            ))
+          )}
+        </div>
+
+        <form onSubmit={onAiSubmit} className="p-2 border-t border-slate-200/70 bg-slate-100">
+          <div className="relative">
+            <textarea
+              value={aiInput}
+              onChange={(event) => onAiInputChange(event.target.value)}
+              onKeyDown={handleAiKeyDown}
+              disabled={!canEdit || aiLoading}
+              rows={4}
+              className="min-h-[68px] max-h-28 w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-300 disabled:opacity-60"
+              placeholder={canEdit ? '描述要修改的代码，按 Ctrl+Enter 发送给AI' : '只读模式不能使用AI修改'}
+            />
+            {aiLoading && (
+              <Loader2 className="absolute bottom-2 right-2 w-4 h-4 animate-spin text-indigo-500" />
+            )}
+          </div>
+        </form>
       </div>
     </div>
   );

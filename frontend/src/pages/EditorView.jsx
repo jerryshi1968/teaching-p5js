@@ -9,6 +9,7 @@ import { useAppDialog } from '../hooks/useAppDialog';
 const TEXT_EXTENSIONS = ['.html', '.htm', '.css', '.js', '.txt'];
 const CODE_FONT_SIZE_KEY = 'teaching_editor_code_font_size';
 const CODE_FONT_SIZES = ['small', 'medium', 'large'];
+const AI_TARGET_FILES = ['index.html', 'style.css', 'sketch.js'];
 
 const isEditableTextFile = (file) => file && !file.isDirectory && file.isText;
 
@@ -45,6 +46,10 @@ const EditorView = () => {
   const [projectName, setProjectName] = useState('加载中...');
   const [canEdit, setCanEdit] = useState(false);
   const [coords, setCoords] = useState(null);
+  const [aiInput, setAiInput] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMessages, setAiMessages] = useState([]);
+  const [pendingAiFiles, setPendingAiFiles] = useState(null);
   const [codeFontSize, setCodeFontSize] = useState(() => {
     const savedSize = localStorage.getItem(CODE_FONT_SIZE_KEY);
     return CODE_FONT_SIZES.includes(savedSize) ? savedSize : 'medium';
@@ -165,6 +170,115 @@ const EditorView = () => {
     setFiles((previousFiles) => previousFiles.map((file) => (
       file.id === activeFile.id ? { ...file, content: newContent } : file
     )));
+  };
+
+  const getAiFilePayload = () => {
+    const payload = {};
+
+    files.forEach((file) => {
+      if (!isEditableTextFile(file)) return;
+      const cleanPath = file.path.replace(/^\.\//, '');
+      if (!AI_TARGET_FILES.includes(cleanPath)) return;
+      payload[cleanPath] = file.content || '';
+    });
+
+    return payload;
+  };
+
+  const appendAiMessage = (role, content) => {
+    setAiMessages((previousMessages) => [
+      ...previousMessages,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        role,
+        content
+      }
+    ]);
+  };
+
+  const handleAiSubmit = async (event) => {
+    event.preventDefault();
+    if (!canEdit || aiLoading) return;
+
+    const prompt = aiInput.trim();
+    if (!prompt) return;
+
+    const filePayload = getAiFilePayload();
+    if (!filePayload['index.html']) {
+      appendAiMessage('error', '没有找到 index.html，暂时不能让 AI 修改这个项目。');
+      return;
+    }
+
+    setAiInput('');
+    setPendingAiFiles(null);
+    appendAiMessage('user', prompt);
+    setAiLoading(true);
+
+    try {
+      const data = await requestJson(`/api/ai/project/${projectId}/code`, {
+        method: 'POST',
+        body: JSON.stringify({
+          prompt,
+          files: filePayload,
+          activeFile: activeFile?.path?.replace(/^\.\//, '') || ''
+        })
+      });
+      setPendingAiFiles(data.files || {});
+      appendAiMessage('assistant', `${data.message || 'AI 已生成代码修改建议。'}\n\n点击上方对勾应用修改，点击叉号取消。`);
+    } catch (err) {
+      appendAiMessage('error', err.message);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAiCancel = () => {
+    setPendingAiFiles(null);
+    appendAiMessage('assistant', '已取消这次 AI 修改。');
+  };
+
+  const handleAiApply = async () => {
+    if (!canEdit || !pendingAiFiles) return;
+
+    const entries = Object.entries(pendingAiFiles).filter(([fileName, content]) => (
+      AI_TARGET_FILES.includes(fileName) && typeof content === 'string'
+    ));
+    if (entries.length === 0) {
+      appendAiMessage('error', 'AI 没有返回可应用的文件内容。');
+      return;
+    }
+
+    let nextFiles = files;
+    const updatedIds = new Set();
+
+    nextFiles = files.map((file) => {
+      const cleanPath = file.path.replace(/^\.\//, '');
+      const nextEntry = entries.find(([fileName]) => fileName === cleanPath);
+      if (!nextEntry || !isEditableTextFile(file)) return file;
+
+      updatedIds.add(file.id);
+      return { ...file, content: nextEntry[1] };
+    });
+
+    const filesToSave = nextFiles.filter((file) => updatedIds.has(file.id));
+    if (filesToSave.length === 0) {
+      appendAiMessage('error', 'AI 返回的文件在当前项目中不存在，没有写入任何内容。');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await saveFilesToServer(filesToSave);
+      setFiles(nextFiles);
+      setPendingAiFiles(null);
+      setPreviewUrl(getProjectPreviewUrl());
+      setActiveFileId(filesToSave[0].id);
+      appendAiMessage('assistant', `已应用并保存 AI 修改：${filesToSave.map((file) => file.name).join('、')}`);
+    } catch (err) {
+      appendAiMessage('error', err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSaveActiveFile = async () => {
@@ -514,6 +628,14 @@ const EditorView = () => {
           onUpload={handleUpload}
           onRename={handleRename}
           onDelete={handleDelete}
+          aiMessages={aiMessages}
+          aiInput={aiInput}
+          aiLoading={aiLoading}
+          aiPending={Boolean(pendingAiFiles)}
+          onAiInputChange={setAiInput}
+          onAiSubmit={handleAiSubmit}
+          onAiApply={handleAiApply}
+          onAiCancel={handleAiCancel}
         />
 
         <Split className="flex-1 flex" sizes={[55, 45]} minSize={250} gutterSize={8} direction="horizontal">
