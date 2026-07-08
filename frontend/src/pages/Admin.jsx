@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Edit2, Plus, Save, School, Trash2, Users, X } from 'lucide-react';
-import { createAdminClass, deleteAdminClass, fetchAdminClasses, fetchAdminClassStudents, fetchAdminTeachers, fetchAdminUsers, updateAdminClass, updateAdminUserRole } from '../services/api';
+import { createAdminClass, deleteAdminClass, fetchAdminClasses, fetchAdminClassStudents, fetchAdminTeachers, fetchAdminUsers, rechargeAdminUserTokens, updateAdminClass, updateAdminUserRole } from '../services/api';
 
 const PAGE_SIZE = 10;
 
@@ -17,6 +17,7 @@ const Admin = () => {
   const [searchInput, setSearchInput] = useState('');
   const [usernameKeyword, setUsernameKeyword] = useState('');
   const [roleUpdatingId, setRoleUpdatingId] = useState(null);
+  const [tokenChargingId, setTokenChargingId] = useState(null);
   const [classes, setClasses] = useState([]);
   const [classPage, setClassPage] = useState(1);
   const [classTotalPages, setClassTotalPages] = useState(1);
@@ -147,6 +148,30 @@ const Admin = () => {
       setError(err.message || '修改用户角色失败，请重试。');
     } finally {
       setRoleUpdatingId(null);
+    }
+  };
+
+  const handleRechargeTokens = async (user) => {
+    const rawAmount = window.prompt(`请输入给 ${user.username || '该用户'} 充值的 Token 数量`, '100000');
+    if (rawAmount === null) return;
+
+    const amount = Number.parseInt(rawAmount, 10);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Token 充值数量必须是正整数。');
+      return;
+    }
+
+    try {
+      setError('');
+      setTokenChargingId(user.id);
+      const data = await rechargeAdminUserTokens(user.id, amount);
+      setUsers((currentUsers) => currentUsers.map((item) => (
+        item.id === user.id ? { ...item, tokens: data.tokens } : item
+      )));
+    } catch (err) {
+      setError(err.message || 'Token 充值失败，请重试。');
+    } finally {
+      setTokenChargingId(null);
     }
   };
 
@@ -404,21 +429,22 @@ const Admin = () => {
                       <th className="px-4 py-3 text-left font-black">性别</th>
                       <th className="px-4 py-3 text-left font-black">生日</th>
                       <th className="px-4 py-3 text-left font-black">角色</th>
+                      <th className="px-4 py-3 text-left font-black">Token余额</th>
                       <th className="px-4 py-3 text-left font-black">创建时间</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {loading ? (
                       <tr>
-                        <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="7">加载中...</td>
+                        <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="8">加载中...</td>
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td className="px-4 py-10 text-center text-rose-500 font-bold" colSpan="7">{error}</td>
+                        <td className="px-4 py-10 text-center text-rose-500 font-bold" colSpan="8">{error}</td>
                       </tr>
                     ) : users.length === 0 ? (
                       <tr>
-                        <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="7">暂无用户</td>
+                        <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="8">暂无用户</td>
                       </tr>
                     ) : (
                       users.map((user) => (
@@ -442,6 +468,19 @@ const Admin = () => {
                                 <option value="teacher">教师</option>
                               </select>
                             )}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-bold text-slate-700">{Number(user.tokens || 0).toLocaleString()}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRechargeTokens(user)}
+                                disabled={tokenChargingId === user.id}
+                                className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+                              >
+                                {tokenChargingId === user.id ? '充值中...' : '充值'}
+                              </button>
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-slate-600">{formatDateTime(user.created_at)}</td>
                         </tr>

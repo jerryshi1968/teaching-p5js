@@ -6,7 +6,7 @@ exports.findByUsername = async (username) => {
 };
 
 exports.findById = async (id) => {
-  const [rows] = await db.query('SELECT id, username, phone, class_code, gender, birthday, role FROM users WHERE id = ?', [id]);
+  const [rows] = await db.query('SELECT id, username, phone, class_code, gender, birthday, role, tokens FROM users WHERE id = ?', [id]);
   return rows[0] || null;
 };
 
@@ -92,7 +92,7 @@ exports.listUsersPaginated = async ({ limit, offset, username = '' }) => {
   const whereClause = keyword ? ' WHERE u.username LIKE ?' : '';
   const params = keyword ? [`%${keyword}%`, limit, offset] : [limit, offset];
   const [rows] = await db.query(
-    `SELECT u.id, u.username, u.phone, u.class_code, c.name AS class_name, u.gender, DATE_FORMAT(u.birthday, "%Y-%m-%d") AS birthday, u.role, u.created_at FROM users u LEFT JOIN classes c ON u.class_code = c.class_code${whereClause} ORDER BY u.created_at DESC, u.id DESC LIMIT ? OFFSET ?`,
+    `SELECT u.id, u.username, u.phone, u.class_code, c.name AS class_name, u.gender, DATE_FORMAT(u.birthday, "%Y-%m-%d") AS birthday, u.role, u.tokens, u.created_at FROM users u LEFT JOIN classes c ON u.class_code = c.class_code${whereClause} ORDER BY u.created_at DESC, u.id DESC LIMIT ? OFFSET ?`,
     params
   );
   return rows;
@@ -110,6 +110,27 @@ exports.updateRole = async ({ id, role }) => {
   const [result] = await db.query(
     'UPDATE users SET role = ? WHERE id = ? AND role <> "admin"',
     [role, id]
+  );
+  return result.affectedRows;
+};
+
+exports.getTokensById = async (id) => {
+  const [rows] = await db.query('SELECT id, tokens FROM users WHERE id = ?', [id]);
+  return rows[0] || null;
+};
+
+exports.rechargeTokens = async ({ id, amount }) => {
+  const [result] = await db.query(
+    'UPDATE users SET tokens = tokens + ? WHERE id = ?',
+    [amount, id]
+  );
+  return result.affectedRows;
+};
+
+exports.deductTokens = async ({ id, amount }) => {
+  const [result] = await db.query(
+    'UPDATE users SET tokens = tokens - ? WHERE id = ?',
+    [amount, id]
   );
   return result.affectedRows;
 };

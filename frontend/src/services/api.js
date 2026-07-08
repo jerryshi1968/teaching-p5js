@@ -209,6 +209,23 @@ export const updateAdminUserRole = async (userId, role) => {
   return data;
 };
 
+export const rechargeAdminUserTokens = async (userId, amount) => {
+  const response = await fetch(`/api/admin/users/${userId}/tokens/recharge`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify({ amount })
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权给用户充值 Token。');
+  }
+  if (!response.ok) throw new Error(data?.message || `Token 充值失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
 export const fetchMyClasses = async () => {
   const response = await fetch('/api/auth/my-classes', {
     method: 'GET',

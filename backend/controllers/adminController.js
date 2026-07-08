@@ -102,6 +102,37 @@ exports.updateUserRole = async (req, res, next) => {
   }
 };
 
+exports.rechargeUserTokens = async (req, res, next) => {
+  try {
+    const userId = Number.parseInt(req.params.id, 10);
+    const amount = Number.parseInt(req.body.amount, 10);
+
+    if (!Number.isFinite(userId) || userId <= 0) {
+      return res.status(400).json({ message: '用户 ID 不正确。' });
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: '充值 token 数量必须是正整数。' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: '用户不存在。' });
+    }
+
+    await User.rechargeTokens({ id: userId, amount });
+    const updatedUser = await User.findById(userId);
+
+    res.json({
+      user: updatedUser,
+      tokens: Number(updatedUser?.tokens || 0),
+      message: 'Token 充值成功。'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.listTeachers = async (req, res, next) => {
   try {
     const teachers = await User.listTeachers();

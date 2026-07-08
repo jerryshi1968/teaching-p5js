@@ -1,4 +1,5 @@
 const Project = require('../models/projectModel');
+const User = require('../models/userModel');
 
 const AI_MODEL = 'deepseek-v4-flash';
 const ALLOWED_FILES = new Set(['index.html', 'style.css', 'sketch.js']);
@@ -50,6 +51,10 @@ function parseAiJson(rawContent) {
   }
 }
 
+function getUsedTokens(usage = {}) {
+  return Number(usage.prompt_tokens || 0) + Number(usage.completion_tokens || 0);
+}
+
 exports.generateCodeSuggestion = async (req, res, next) => {
   try {
     const projectId = req.params.projectId;
@@ -57,6 +62,11 @@ exports.generateCodeSuggestion = async (req, res, next) => {
 
     if (!project || project.user_id !== req.user.id) {
       return res.status(403).json({ message: '无权使用 AI 修改该项目。' });
+    }
+
+    const tokenBalance = await User.getTokensById(req.user.id);
+    if (!tokenBalance || Number(tokenBalance.tokens || 0) <= 0) {
+      return res.status(402).json({ message: 'Token余额不足，请联系老师充值。' });
     }
 
     const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -109,6 +119,11 @@ exports.generateCodeSuggestion = async (req, res, next) => {
     }
 
     const rawContent = data?.choices?.[0]?.message?.content;
+    const usedTokens = getUsedTokens(data?.usage);
+    if (usedTokens > 0) {
+      await User.deductTokens({ id: req.user.id, amount: usedTokens });
+    }
+    const latestTokenBalance = await User.getTokensById(req.user.id);
     const parsed = parseAiJson(rawContent);
     const suggestedFiles = normalizeAiFiles(parsed.files);
 
@@ -119,7 +134,11 @@ exports.generateCodeSuggestion = async (req, res, next) => {
     res.json({
       message: String(parsed.message || 'AI 已生成代码修改建议。'),
       files: suggestedFiles,
-      model: AI_MODEL
+      model: AI_MODEL,
+      usage: {
+        usedTokens,
+        remainingTokens: Number(latestTokenBalance?.tokens || 0)
+      }
     });
   } catch (err) {
     next(err);

@@ -224,7 +224,10 @@ const EditorView = () => {
         })
       });
       setPendingAiFiles(data.files || {});
-      appendAiMessage('assistant', `${data.message || 'AI 已生成代码修改建议。'}\n\n点击上方对勾应用修改，点击叉号取消。`);
+      const usageText = data.usage
+        ? '\n\n本次消耗 ' + Number(data.usage.usedTokens || 0).toLocaleString() + ' tokens，剩余 ' + Number(data.usage.remainingTokens || 0).toLocaleString() + ' tokens。'
+        : '';
+      appendAiMessage('assistant', (data.message || 'AI 已生成代码修改建议。') + usageText + '\n\n点击上方对勾应用修改，点击叉号取消。');
     } catch (err) {
       appendAiMessage('error', err.message);
     } finally {

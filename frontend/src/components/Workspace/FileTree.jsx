@@ -239,11 +239,18 @@ const FileTree = ({
               disabled={!canEdit || aiLoading}
               rows={4}
               className="min-h-[68px] max-h-28 w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-300 disabled:opacity-60"
-              placeholder={canEdit ? '描述要修改的代码，按 Ctrl+Enter 发送给AI' : '只读模式不能使用AI修改'}
+              placeholder={canEdit ? '描述要修改的代码，可点发送AI或按 Ctrl+Enter' : '只读模式不能使用AI修改'}
             />
-            {aiLoading && (
-              <Loader2 className="absolute bottom-2 right-2 w-4 h-4 animate-spin text-indigo-500" />
-            )}
+          </div>
+          <div className="mt-1.5 flex justify-end">
+            <button
+              type="submit"
+              disabled={!canEdit || aiLoading || !aiInput.trim()}
+              className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md bg-indigo-500 px-3 text-[11px] font-black text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {aiLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>{aiLoading ? '发送中' : '发送AI'}</span>
+            </button>
           </div>
         </form>
       </div>
