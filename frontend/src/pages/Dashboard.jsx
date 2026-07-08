@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Folder, MoveRight, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy, ShieldCheck } from 'lucide-react';
+import { ArrowDown, ArrowUp, Folder, MoveRight, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy, ShieldCheck, Send } from 'lucide-react';
 // 导入网络请求工具
-import { fetchMyProjects, copyProject, fetchMyClasses, fetchStudentsByClass, fetchProjectGroups, fetchAllProjectGroups, createProjectGroup, updateProjectGroup, moveProjectGroup, reorderProjectGroups, deleteProjectGroup, moveProject, reorderProjects } from '../services/api';
+import { fetchMyProjects, copyProject, distributeProjectToClass, fetchMyClasses, fetchStudentsByClass, fetchProjectGroups, fetchAllProjectGroups, createProjectGroup, updateProjectGroup, moveProjectGroup, reorderProjectGroups, deleteProjectGroup, moveProject, reorderProjects } from '../services/api';
 import { useAppDialog } from '../hooks/useAppDialog';
 import ProfileDialog from '../components/Common/ProfileDialog';
 
@@ -524,6 +524,43 @@ const Dashboard = () => {
     }
   };
 
+  const handleDistributeProject = async (e, project) => {
+    e.stopPropagation();
+
+    const selectedClass = findSelectedClass();
+    if (!selectedClass) {
+      await appDialog.alert({
+        title: '无法分发',
+        message: '请先在上方选择一个班级，再分发项目。'
+      });
+      return;
+    }
+
+    const confirmed = await appDialog.confirm({
+      title: '分发给班级',
+      message: `确定将「${project.name}」分发给「${selectedClass.name}」的所有学生吗？`,
+      highlight: `学生刷新后会在根作品组看到：来自${currentUser?.username || '老师'} - ${project.name}`,
+      confirmText: '确认分发'
+    });
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      const result = await distributeProjectToClass(project.id, selectedClass.id);
+      await appDialog.alert({
+        title: '分发完成',
+        message: result.message || '项目已分发给班级学生。'
+      });
+    } catch (err) {
+      await appDialog.alert({
+        title: '分发失败',
+        message: err.message
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 6. 退出登录逻辑
   const handleLogout = async () => {
     if (await appDialog.confirm({
@@ -933,6 +970,16 @@ const Dashboard = () => {
                       {/* 操作按钮区（仅在看自己的项目时显示，防止老师误修改或误删学生作品） */}
                       {selectedStudentId === 'me' && (
                         <div className="flex items-center justify-end space-x-1">
+                          {currentUser?.role === 'teacher' && (
+                            <button
+                              onClick={(e) => handleDistributeProject(e, project)}
+                              disabled={!findSelectedClass()}
+                              className="text-slate-400 hover:text-amber-500 hover:bg-amber-50 p-1.5 rounded-xl transition duration-150 disabled:opacity-30"
+                              title={findSelectedClass() ? '分发给当前班级' : '请先选择班级'}
+                            >
+                              <Send className="w-4.5 h-4.5" />
+                            </button>
+                          )}
                           <button
                             onClick={(e) => handleReorderProject(e, index, -1)}
                             disabled={index === 0}

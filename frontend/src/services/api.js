@@ -420,3 +420,20 @@ export const copyProject = async (projectId) => {
   if (!response.ok) throw new Error(data?.message || `复制项目失败（HTTP ${response.status}），请重试。`);
   return data;
 };
+
+export const distributeProjectToClass = async (projectId, classId) => {
+  const response = await fetch(`/api/projects/${projectId}/distribute-to-class`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify({ classId })
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权分发该项目。');
+  }
+  if (!response.ok) throw new Error(data?.message || `分发项目失败（HTTP ${response.status}），请重试。`);
+  return data;
+};

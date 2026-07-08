@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const Project = require('../models/projectModel');
 const ProjectGroup = require('../models/projectGroupModel');
 const File = require('../models/fileModel');
+const Class = require('../models/classModel');
 
 const PROJECTS_BASE_DIR = path.resolve(__dirname, '../storage/projects');
 
@@ -41,6 +42,37 @@ const normalizeParentId = (value) => {
   if (value === undefined || value === null || value === '' || value === 'null') return null;
   const parentId = Number.parseInt(value, 10);
   return Number.isFinite(parentId) && parentId > 0 ? parentId : NaN;
+};
+
+const copyProjectToUser = async (connection, { sourceProject, targetUserId, targetName, parentId = null }) => {
+  const projectId = crypto.randomUUID();
+  const sourceProjectFolder = path.join(PROJECTS_BASE_DIR, sourceProject.id);
+  const newProjectFolder = path.join(PROJECTS_BASE_DIR, projectId);
+
+  await Project.createWithConnection(connection, {
+    id: projectId,
+    userId: targetUserId,
+    name: targetName,
+    parentId
+  });
+
+  const files = await File.findByProjectId(sourceProject.id);
+  for (const file of files) {
+    await File.createWithConnection(connection, {
+      projectId,
+      name: file.name,
+      path: file.path
+    });
+  }
+
+  try {
+    await fs.cp(sourceProjectFolder, newProjectFolder, { recursive: true });
+  } catch (err) {
+    await fs.rm(newProjectFolder, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
+
+  return { projectId, projectName: targetName, projectFolder: newProjectFolder };
 };
 
 exports.listProjects = async (req, res, next) => {
@@ -170,6 +202,83 @@ exports.copyProject = async (req, res, next) => {
     next(err);
   } finally {
     connection.release();
+  }
+};
+
+exports.distributeProjectToClass = async (req, res, next) => {
+  const classId = Number.parseInt(req.body.classId, 10);
+
+  try {
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ message: '只有教师可以分发项目。' });
+    }
+
+    if (!Number.isFinite(classId) || classId <= 0) {
+      return res.status(400).json({ message: '请先选择要分发的班级。' });
+    }
+
+    const sourceProject = await Project.findAccessibleWithOwnerById(req.params.id, req.user);
+    if (!sourceProject || sourceProject.user_id !== req.user.id) {
+      return res.status(404).json({ message: '项目不存在或无权分发。' });
+    }
+
+    const targetClass = await Class.findById(classId);
+    if (!targetClass || targetClass.teacher_user_id !== req.user.id) {
+      return res.status(403).json({ message: '无权向该班级分发项目。' });
+    }
+
+    const students = await Class.listStudentsByClassId(classId);
+    if (students.length === 0) {
+      return res.json({
+        message: '当前班级暂无学生，未分发项目。',
+        createdCount: 0,
+        failedCount: 0,
+        failures: []
+      });
+    }
+
+    const failures = [];
+    let createdCount = 0;
+
+    for (const student of students) {
+      const connection = await Project.getConnection();
+      let copiedProject = null;
+
+      try {
+        await connection.beginTransaction();
+        copiedProject = await copyProjectToUser(connection, {
+          sourceProject,
+          targetUserId: student.id,
+          targetName: `来自${req.user.username} - ${sourceProject.name}`,
+          parentId: null
+        });
+        await connection.commit();
+        createdCount += 1;
+      } catch (err) {
+        await connection.rollback();
+        if (copiedProject?.projectFolder) {
+          await fs.rm(copiedProject.projectFolder, { recursive: true, force: true }).catch(() => {});
+        }
+        failures.push({
+          studentId: student.id,
+          username: student.username,
+          message: err.message
+        });
+      } finally {
+        connection.release();
+      }
+    }
+
+    res.status(201).json({
+      message: failures.length > 0
+        ? `已成功分发给 ${createdCount} 名学生，${failures.length} 名失败。`
+        : `已成功分发给 ${createdCount} 名学生。`,
+      createdCount,
+      failedCount: failures.length,
+      failures
+    });
+  } catch (err) {
+    next(err);
   }
 };
 
