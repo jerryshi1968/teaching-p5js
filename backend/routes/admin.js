@@ -12,6 +12,7 @@ router.get('/teachers', authMiddleware, adminMiddleware, adminController.listTea
 router.get('/classes', authMiddleware, adminMiddleware, adminController.listClasses);
 router.post('/classes', authMiddleware, adminMiddleware, adminController.createClass);
 router.get('/classes/:id/students', authMiddleware, adminMiddleware, adminController.listClassStudents);
+router.delete('/classes/:id/students/:studentId', authMiddleware, adminMiddleware, adminController.removeClassStudent);
 router.put('/classes/:id', authMiddleware, adminMiddleware, adminController.updateClass);
 router.delete('/classes/:id', authMiddleware, adminMiddleware, adminController.deleteClass);
 

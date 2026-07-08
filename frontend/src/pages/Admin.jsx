@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Edit2, Plus, Save, School, Trash2, Users, X } from 'lucide-react';
-import { createAdminClass, deleteAdminClass, fetchAdminClasses, fetchAdminClassStudents, fetchAdminTeachers, fetchAdminUsers, rechargeAdminUserTokens, updateAdminClass, updateAdminUserRole } from '../services/api';
+import { createAdminClass, deleteAdminClass, fetchAdminClasses, fetchAdminClassStudents, fetchAdminTeachers, fetchAdminUsers, rechargeAdminUserTokens, removeAdminClassStudent, updateAdminClass, updateAdminUserRole } from '../services/api';
 
 const PAGE_SIZE = 10;
 
@@ -34,6 +34,7 @@ const Admin = () => {
   const [classStudents, setClassStudents] = useState([]);
   const [classStudentsLoading, setClassStudentsLoading] = useState(false);
   const [classStudentsError, setClassStudentsError] = useState('');
+  const [removingClassStudentId, setRemovingClassStudentId] = useState(null);
 
   const currentUser = useMemo(() => {
     const userJson = localStorage.getItem('teaching_user');
@@ -294,6 +295,28 @@ const Admin = () => {
     setClassStudentsDialog(null);
     setClassStudents([]);
     setClassStudentsError('');
+    setRemovingClassStudentId(null);
+  };
+
+  const handleRemoveClassStudent = async (student) => {
+    if (!classStudentsDialog) return;
+    if (!window.confirm(`确定将「${student.username || '该学生'}」移出班级吗？`)) return;
+
+    try {
+      setClassStudentsError('');
+      setRemovingClassStudentId(student.id);
+      await removeAdminClassStudent(classStudentsDialog.id, student.id);
+      setClassStudents((currentStudents) => currentStudents.filter((item) => item.id !== student.id));
+      setClasses((currentClasses) => currentClasses.map((item) => (
+        item.id === classStudentsDialog.id
+          ? { ...item, student_count: Math.max(0, Number(item.student_count || 0) - 1) }
+          : item
+      )));
+    } catch (err) {
+      setClassStudentsError(err.message || '移除班级学生失败，请重试。');
+    } finally {
+      setRemovingClassStudentId(null);
+    }
   };
 
   const formatDateTime = (value) => {
@@ -640,20 +663,21 @@ const Admin = () => {
                     <th className="px-4 py-3 text-left font-black">性别</th>
                     <th className="px-4 py-3 text-left font-black">生日</th>
                     <th className="px-4 py-3 text-left font-black">创建时间</th>
+                    <th className="px-4 py-3 text-right font-black">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {classStudentsLoading ? (
                     <tr>
-                      <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="5">加载中...</td>
+                      <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="6">加载中...</td>
                     </tr>
                   ) : classStudentsError ? (
                     <tr>
-                      <td className="px-4 py-10 text-center text-rose-500 font-bold" colSpan="5">{classStudentsError}</td>
+                      <td className="px-4 py-10 text-center text-rose-500 font-bold" colSpan="6">{classStudentsError}</td>
                     </tr>
                   ) : classStudents.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="5">暂无学生</td>
+                      <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="6">暂无学生</td>
                     </tr>
                   ) : (
                     classStudents.map((student) => (
@@ -663,6 +687,16 @@ const Admin = () => {
                         <td className="px-4 py-3 text-slate-600">{formatGender(student.gender)}</td>
                         <td className="px-4 py-3 text-slate-600">{formatDate(student.birthday)}</td>
                         <td className="px-4 py-3 text-slate-600">{formatDateTime(student.created_at)}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveClassStudent(student)}
+                            disabled={removingClassStudentId === student.id}
+                            className="rounded-lg border border-rose-100 px-3 py-1 text-xs font-black text-rose-500 transition hover:bg-rose-50 disabled:opacity-50"
+                          >
+                            {removingClassStudentId === student.id ? '移除中...' : '移除'}
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}

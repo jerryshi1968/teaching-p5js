@@ -73,6 +73,17 @@ exports.listStudentsByClassId = async (id) => {
   return rows;
 };
 
+exports.removeStudentFromClass = async ({ classId, studentId }) => {
+  const [result] = await db.query(
+    `UPDATE users u
+     JOIN classes c ON u.class_code = c.class_code
+     SET u.class_code = NULL
+     WHERE c.id = ? AND u.id = ? AND u.role = "student"`,
+    [classId, studentId]
+  );
+  return result.affectedRows;
+};
+
 exports.create = async ({ name, classCode, teacherUserId }) => {
   const [result] = await db.query(
     'INSERT INTO classes (name, class_code, teacher_user_id) VALUES (?, ?, ?)',

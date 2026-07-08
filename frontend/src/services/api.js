@@ -311,6 +311,22 @@ export const fetchAdminClassStudents = async (classId) => {
   return data;
 };
 
+export const removeAdminClassStudent = async (classId, studentId) => {
+  const response = await fetch(`/api/admin/classes/${classId}/students/${studentId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    }
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权移除班级学生。');
+  }
+  if (!response.ok) throw new Error(data?.message || `移除班级学生失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
 export const createAdminClass = async (payload) => {
   const response = await fetch('/api/admin/classes', {
     method: 'POST',
