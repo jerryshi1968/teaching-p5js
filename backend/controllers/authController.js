@@ -26,6 +26,8 @@ const hashValue = (value) => crypto
 
 const normalizePurpose = (purpose) => SMS_PURPOSES.includes(purpose) ? purpose : null;
 
+const canUseTeacherFeatures = (user) => user?.role === 'teacher' || user?.role === 'admin';
+
 const getRequestIp = (req) => req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
 
 const verifySmsCode = async ({ phone, code, sourceIp }) => {
@@ -408,11 +410,11 @@ exports.login = async (req, res, next) => {
 
 exports.listStudents = async (req, res, next) => {
   try {
-    if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+    if (!canUseTeacherFeatures(req.user)) {
       return res.status(403).json({ message: '无权查看学生列表。' });
     }
 
-    const students = await User.listStudents();
+    const students = await User.listStudentsByTeacher(req.user.id);
     res.json(students);
   } catch (err) {
     next(err);
@@ -421,7 +423,7 @@ exports.listStudents = async (req, res, next) => {
 
 exports.listMyClasses = async (req, res, next) => {
   try {
-    if (req.user.role !== 'teacher') {
+    if (!canUseTeacherFeatures(req.user)) {
       return res.status(403).json({ message: '无权查看班级列表。' });
     }
 
@@ -434,7 +436,7 @@ exports.listMyClasses = async (req, res, next) => {
 
 exports.listStudentsByClass = async (req, res, next) => {
   try {
-    if (req.user.role !== 'teacher') {
+    if (!canUseTeacherFeatures(req.user)) {
       return res.status(403).json({ message: '无权查看班级学生列表。' });
     }
 

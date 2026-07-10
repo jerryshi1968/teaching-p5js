@@ -56,6 +56,18 @@ exports.listStudents = async () => {
   return rows;
 };
 
+exports.listStudentsByTeacher = async (teacherUserId) => {
+  const [rows] = await db.query(
+    `SELECT u.id, u.username
+     FROM users u
+     JOIN classes c ON u.class_code = c.class_code
+     WHERE u.role = "student" AND c.teacher_user_id = ?
+     ORDER BY u.username ASC`,
+    [teacherUserId]
+  );
+  return rows;
+};
+
 exports.listStudentsByTeacherClass = async ({ teacherUserId, classCode }) => {
   const [rows] = await db.query(
     `SELECT u.id, u.username
@@ -82,7 +94,7 @@ exports.isStudentVisibleToTeacher = async ({ teacherUserId, studentId }) => {
 
 exports.listTeachers = async () => {
   const [rows] = await db.query(
-    'SELECT id, username FROM users WHERE role = "teacher" ORDER BY username ASC'
+    'SELECT id, username FROM users WHERE role IN ("teacher", "admin") ORDER BY username ASC'
   );
   return rows;
 };

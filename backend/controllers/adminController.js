@@ -25,7 +25,7 @@ const validateClassPayload = async ({ name, classCode, teacherUserId }) => {
   }
 
   const teacher = await User.findById(teacherUserId);
-  if (!teacher || teacher.role !== 'teacher') {
+  if (!teacher || !['teacher', 'admin'].includes(teacher.role)) {
     return { status: 400, message: '请选择有效的教师账号。' };
   }
 

@@ -10,6 +10,8 @@ const DASHBOARD_SELECTED_CLASS_KEY = 'teaching_dashboard_selected_class_code';
 const DASHBOARD_SELECTED_STUDENT_KEY = 'teaching_dashboard_selected_student_id';
 const DASHBOARD_CURRENT_GROUP_KEY = 'teaching_dashboard_current_group_id';
 
+const canUseTeacherFeatures = (user) => user?.role === 'teacher' || user?.role === 'admin';
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -112,7 +114,7 @@ const Dashboard = () => {
     }
 
     // 如果当前登录的是教师，拉取班级列表
-    if (parsedUser && parsedUser.role === 'teacher') {
+    if (parsedUser && canUseTeacherFeatures(parsedUser)) {
       fetchMyClasses()
         .then(data => {
           const classes = Array.isArray(data) ? data : [];
@@ -147,7 +149,7 @@ const Dashboard = () => {
   }, [currentGroupId]);
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== 'teacher') return;
+    if (!currentUser || !canUseTeacherFeatures(currentUser)) return;
 
     if (!selectedClassCode) {
       setStudents([]);
@@ -193,12 +195,12 @@ const Dashboard = () => {
   useEffect(() => {
     if (!currentUser) return;
 
-    if (currentUser.role !== 'teacher' && selectedStudentId !== 'me') {
+    if (!canUseTeacherFeatures(currentUser) && selectedStudentId !== 'me') {
       setSelectedStudentId('me');
       return;
     }
 
-    if (currentUser.role === 'teacher' && selectedStudentId !== 'me' && !studentsLoaded) return;
+    if (canUseTeacherFeatures(currentUser) && selectedStudentId !== 'me' && !studentsLoaded) return;
 
     setLoading(true);
     // 如果选中的是 'me'，传入 null（拉取自己的项目）；否则传入具体的学生 ID
@@ -703,7 +705,7 @@ const Dashboard = () => {
       <main className="flex-1 max-w-6xl w-full mx-auto p-6 md:p-8">
         
         {/* === 【教师专属】学生看板控制区 === */}
-        {currentUser?.role === 'teacher' && (
+        {canUseTeacherFeatures(currentUser) && (
           <div className="mb-8 bg-white/80 border-4 border-indigo-100 rounded-[2rem] p-5 shadow-[0_6px_16px_rgba(0,0,0,0.02)]">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
               <h3 className="text-xs font-black text-indigo-950 flex items-center gap-2">
@@ -970,7 +972,7 @@ const Dashboard = () => {
                       {/* 操作按钮区（仅在看自己的项目时显示，防止老师误修改或误删学生作品） */}
                       {selectedStudentId === 'me' && (
                         <div className="flex items-center justify-end space-x-1">
-                          {currentUser?.role === 'teacher' && (
+                          {canUseTeacherFeatures(currentUser) && (
                             <button
                               onClick={(e) => handleDistributeProject(e, project)}
                               disabled={!findSelectedClass()}

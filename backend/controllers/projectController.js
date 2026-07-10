@@ -38,6 +38,8 @@ canvas {
 }`
 };
 
+const canUseTeacherFeatures = (user) => user?.role === 'teacher' || user?.role === 'admin';
+
 const normalizeParentId = (value) => {
   if (value === undefined || value === null || value === '' || value === 'null') return null;
   const parentId = Number.parseInt(value, 10);
@@ -209,7 +211,7 @@ exports.distributeProjectToClass = async (req, res, next) => {
   const classId = Number.parseInt(req.body.classId, 10);
 
   try {
-    if (req.user.role !== 'teacher') {
+    if (!canUseTeacherFeatures(req.user)) {
       return res.status(403).json({ message: '只有教师可以分发项目。' });
     }
 

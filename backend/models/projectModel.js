@@ -1,6 +1,7 @@
 const db = require('../config/db');
 
 const canAccessAllProjects = () => false;
+const canUseTeacherFeatures = (user) => user?.role === 'teacher' || user?.role === 'admin';
 
 exports.getConnection = () => db.getConnection();
 
@@ -21,7 +22,7 @@ exports.listVisibleToUser = async ({ currentUser, studentId, parentId = null }) 
     return exports.listForUser(studentId, parentId);
   }
 
-  if (currentUser.role !== 'teacher') {
+  if (!canUseTeacherFeatures(currentUser)) {
     return null;
   }
 
@@ -82,7 +83,7 @@ exports.findAccessibleById = async (projectId, user) => {
     return rows[0] || null;
   }
 
-  if (user.role === 'teacher') {
+  if (canUseTeacherFeatures(user)) {
     const ownProject = await exports.findOwnedById(projectId, user.id);
     if (ownProject) {
       const [rows] = await db.query('SELECT id, name, user_id FROM projects WHERE id = ?', [projectId]);
@@ -111,7 +112,7 @@ exports.findAccessibleWithOwnerById = async (projectId, user) => {
     return rows[0] || null;
   }
 
-  if (user.role === 'teacher') {
+  if (canUseTeacherFeatures(user)) {
     const [ownRows] = await db.query(
       `SELECT p.id, p.name, p.user_id, u.username AS owner_name
        FROM projects p

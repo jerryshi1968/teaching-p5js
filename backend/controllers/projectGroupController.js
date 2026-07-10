@@ -8,10 +8,12 @@ const normalizeParentId = (value) => {
   return Number.isFinite(parentId) && parentId > 0 ? parentId : NaN;
 };
 
+const canUseTeacherFeatures = (user) => user?.role === 'teacher' || user?.role === 'admin';
+
 const resolveReadableOwnerId = async ({ currentUser, studentId }) => {
   if (!studentId) return currentUser.id;
 
-  if (currentUser.role !== 'teacher') return null;
+  if (!canUseTeacherFeatures(currentUser)) return null;
 
   const visible = await User.isStudentVisibleToTeacher({
     teacherUserId: currentUser.id,
