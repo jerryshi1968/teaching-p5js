@@ -66,7 +66,8 @@ const formatUserProfile = (user) => ({
   classCode: user.class_code || '',
   gender: user.gender || null,
   birthday: formatBirthday(user.birthday),
-  role: user.role
+  role: user.role,
+  tokens: Number(user.tokens || 0)
 });
 
 exports.createCaptchaChallenge = async (req, res, next) => {

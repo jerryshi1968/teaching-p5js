@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarDays, Eye, EyeOff, KeyRound, Lock, Phone, Save, User, Users, X } from 'lucide-react';
+import { CalendarDays, Coins, Eye, EyeOff, KeyRound, Lock, Phone, Save, User, Users, X } from 'lucide-react';
 import SmsCodeField from './SmsCodeField';
 
 const currentYear = new Date().getFullYear();
@@ -34,6 +34,7 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
   const [passwordErrorMsg, setPasswordErrorMsg] = useState('');
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [tokens, setTokens] = useState(0);
   const [originalPhone, setOriginalPhone] = useState('');
   const [smsCode, setSmsCode] = useState('');
   const [passwordForm, setPasswordForm] = useState({
@@ -79,6 +80,7 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
             birthdayMonth: birthday.month,
             birthdayDay: birthday.day
           });
+          setTokens(Number(data.tokens || 0));
           setOriginalPhone(data.phone || '');
           setSmsCode('');
         }
@@ -262,14 +264,20 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
               <p className="mt-1 text-xs font-bold text-slate-400">更新你的账号资料</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-1 text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
-            aria-label="关闭个人信息弹框"
-          >
-            <X className="h-4.5 w-4.5" />
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 rounded-xl border-2 border-amber-200 bg-amber-50 px-2.5 py-1.5 text-amber-700" title="当前 Token 余额">
+              <Coins className="h-4 w-4" />
+              <span className="text-xs font-black">{tokens.toLocaleString()}</span>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-1 text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
+              aria-label="关闭个人信息弹框"
+            >
+              <X className="h-4.5 w-4.5" />
+            </button>
+          </div>
         </div>
 
         {errorMsg && (
