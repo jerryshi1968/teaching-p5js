@@ -10,6 +10,10 @@ const TEXT_EXTENSIONS = ['.html', '.htm', '.css', '.js', '.txt'];
 const CODE_FONT_SIZE_KEY = 'teaching_editor_code_font_size';
 const CODE_FONT_SIZES = ['small', 'medium', 'large'];
 const AI_TARGET_FILES = ['index.html', 'style.css', 'sketch.js'];
+const AI_IMAGE_MAX_EDGE = 1200;
+const AI_IMAGE_MAX_SIZE = 2 * 1024 * 1024;
+const AI_IMAGE_MAX_COUNT = 3;
+const AI_IMAGE_QUALITIES = [0.82, 0.72, 0.62, 0.52, 0.42];
 
 const isEditableTextFile = (file) => file && !file.isDirectory && file.isText;
 
@@ -30,6 +34,75 @@ const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
 });
 
+const loadImageFromFile = (file) => new Promise((resolve, reject) => {
+  const url = URL.createObjectURL(file);
+  const image = new Image();
+  image.onload = () => {
+    URL.revokeObjectURL(url);
+    resolve(image);
+  };
+  image.onerror = (err) => {
+    URL.revokeObjectURL(url);
+    reject(err);
+  };
+  image.src = url;
+});
+
+const canvasToBlob = (canvas, mimeType, quality) => new Promise((resolve) => {
+  canvas.toBlob(resolve, mimeType, quality);
+});
+
+const compressImageForAi = async (file) => {
+  const image = await loadImageFromFile(file);
+  const scale = Math.min(1, AI_IMAGE_MAX_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+
+  context.drawImage(image, 0, 0, width, height);
+
+  for (const quality of AI_IMAGE_QUALITIES) {
+    const blob = await canvasToBlob(canvas, 'image/webp', quality);
+    if (blob && blob.size <= AI_IMAGE_MAX_SIZE) {
+      const dataUrl = await readFileAsDataUrl(blob);
+      return {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: file.name || 'pasted-image.webp',
+        mimeType: blob.type || 'image/webp',
+        dataUrl,
+        size: blob.size,
+        width,
+        height
+      };
+    }
+  }
+
+  context.globalCompositeOperation = 'destination-over';
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, width, height);
+
+  for (const quality of AI_IMAGE_QUALITIES) {
+    const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+    if (blob && blob.size <= AI_IMAGE_MAX_SIZE) {
+      const dataUrl = await readFileAsDataUrl(blob);
+      return {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: file.name || 'pasted-image.jpg',
+        mimeType: blob.type || 'image/jpeg',
+        dataUrl,
+        size: blob.size,
+        width,
+        height
+      };
+    }
+  }
+
+  throw new Error('图片压缩后仍超过 2MB，请裁剪或换一张更小的图片。');
+};
+
 const EditorView = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -47,6 +120,7 @@ const EditorView = () => {
   const [canEdit, setCanEdit] = useState(false);
   const [coords, setCoords] = useState(null);
   const [aiInput, setAiInput] = useState('');
+  const [aiImages, setAiImages] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
   const [pendingAiFiles, setPendingAiFiles] = useState(null);
@@ -196,12 +270,45 @@ const EditorView = () => {
     ]);
   };
 
+  const handleAiImagesPaste = async (imageFiles) => {
+    if (!canEdit || aiLoading) return;
+
+    const availableCount = AI_IMAGE_MAX_COUNT - aiImages.length;
+    if (availableCount <= 0) {
+      await appDialog.alert({
+        title: '图片已满',
+        message: `一次最多粘贴 ${AI_IMAGE_MAX_COUNT} 张图片。`
+      });
+      return;
+    }
+
+    const filesToAdd = imageFiles.slice(0, availableCount);
+
+    try {
+      const compressedImages = [];
+      for (const file of filesToAdd) {
+        compressedImages.push(await compressImageForAi(file));
+      }
+      setAiImages((previousImages) => [...previousImages, ...compressedImages]);
+    } catch (err) {
+      await appDialog.alert({
+        title: '图片处理失败',
+        message: err.message
+      });
+    }
+  };
+
+  const handleAiImageRemove = (imageId) => {
+    setAiImages((previousImages) => previousImages.filter((image) => image.id !== imageId));
+  };
+
   const handleAiSubmit = async (event) => {
     event.preventDefault();
     if (!canEdit || aiLoading) return;
 
     const prompt = aiInput.trim();
-    if (!prompt) return;
+    const images = aiImages.map(({ mimeType, dataUrl }) => ({ mimeType, dataUrl }));
+    if (!prompt && images.length === 0) return;
 
     const filePayload = getAiFilePayload();
     if (!filePayload['index.html']) {
@@ -210,8 +317,9 @@ const EditorView = () => {
     }
 
     setAiInput('');
+    setAiImages([]);
     setPendingAiFiles(null);
-    appendAiMessage('user', prompt);
+    appendAiMessage('user', images.length > 0 ? `${prompt || '请参考图片修改代码。'}\n\n[已附加 ${images.length} 张图片]` : prompt);
     setAiLoading(true);
 
     try {
@@ -219,6 +327,7 @@ const EditorView = () => {
         method: 'POST',
         body: JSON.stringify({
           prompt,
+          images,
           files: filePayload,
           activeFile: activeFile?.path?.replace(/^\.\//, '') || ''
         })
@@ -633,9 +742,12 @@ const EditorView = () => {
           onDelete={handleDelete}
           aiMessages={aiMessages}
           aiInput={aiInput}
+          aiImages={aiImages}
           aiLoading={aiLoading}
           aiPending={Boolean(pendingAiFiles)}
           onAiInputChange={setAiInput}
+          onAiImagesPaste={handleAiImagesPaste}
+          onAiImageRemove={handleAiImageRemove}
           onAiSubmit={handleAiSubmit}
           onAiApply={handleAiApply}
           onAiCancel={handleAiCancel}

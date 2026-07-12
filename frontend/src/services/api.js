@@ -25,7 +25,7 @@ export const fetchMyProjects = async (studentId = null, parentId = null) => {
   if (response.status === 401 || response.status === 403) {
     localStorage.removeItem('teaching_token');
     localStorage.removeItem('teaching_user');
-    window.location.href = '/login';
+    window.location.href = `${import.meta.env.BASE_URL}login`;
     return null;
   }
   return response.json();
@@ -51,7 +51,7 @@ export const fetchProjectGroups = async ({ studentId = null, parentId = null } =
   if (response.status === 401 || response.status === 403) {
     localStorage.removeItem('teaching_token');
     localStorage.removeItem('teaching_user');
-    window.location.href = '/login';
+    window.location.href = `${import.meta.env.BASE_URL}login`;
     return null;
   }
   if (!response.ok) throw new Error(data?.message || `获取作品组失败（HTTP ${response.status}），请重试。`);
@@ -414,7 +414,7 @@ export const copyProject = async (projectId) => {
   if (response.status === 401 || response.status === 403) {
     localStorage.removeItem('teaching_token');
     localStorage.removeItem('teaching_user');
-    window.location.href = '/login';
+    window.location.href = `${import.meta.env.BASE_URL}login`;
     return null;
   }
   if (!response.ok) throw new Error(data?.message || `复制项目失败（HTTP ${response.status}），请重试。`);

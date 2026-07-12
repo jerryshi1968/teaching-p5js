@@ -38,6 +38,28 @@ const getFileIcon = (file) => {
   return <FileCode2 className="w-4 h-4 text-indigo-400 shrink-0" />;
 };
 
+const getClipboardImageFiles = (clipboardData) => {
+  const files = Array.from(clipboardData?.files || [])
+    .filter((file) => file.type.startsWith('image/'));
+  if (files.length > 0) return files;
+
+  const itemFiles = Array.from(clipboardData?.items || [])
+    .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    .map((item) => item.getAsFile())
+    .filter(Boolean);
+
+  return itemFiles;
+};
+
+const getImageFileFromClipboardItem = async (item, index) => {
+  const imageType = item.types.find((type) => type.startsWith('image/'));
+  if (!imageType) return null;
+
+  const blob = await item.getType(imageType);
+  const ext = imageType.split('/')[1] || 'png';
+  return new File([blob], `pasted-image-${index + 1}.${ext}`, { type: imageType });
+};
+
 const FileTree = ({
   files,
   activeFileId,
@@ -50,14 +72,18 @@ const FileTree = ({
   onDelete,
   aiMessages = [],
   aiInput,
+  aiImages = [],
   aiLoading,
   aiPending,
   onAiInputChange,
+  onAiImagesPaste,
+  onAiImageRemove,
   onAiSubmit,
   onAiApply,
   onAiCancel
 }) => {
   const inputRef = useRef(null);
+  const lastImagePasteAtRef = useRef(0);
 
   const sortedFiles = [...files].sort((a, b) => {
     const aDepth = getDepth(a.path);
@@ -83,9 +109,42 @@ const FileTree = ({
   const handleAiKeyDown = (event) => {
     if (event.ctrlKey && event.key === 'Enter') {
       event.preventDefault();
-      if (!canEdit || aiLoading || !aiInput.trim()) return;
+      if (!canEdit || aiLoading || (!aiInput.trim() && aiImages.length === 0)) return;
       onAiSubmit(event);
+      return;
     }
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') {
+      setTimeout(async () => {
+        if (!canEdit || aiLoading || Date.now() - lastImagePasteAtRef.current < 500) return;
+        if (!navigator.clipboard?.read) return;
+
+        try {
+          const items = await navigator.clipboard.read();
+          const imageFiles = (await Promise.all(items.map(getImageFileFromClipboardItem))).filter(Boolean);
+          if (imageFiles.length === 0) return;
+
+          lastImagePasteAtRef.current = Date.now();
+          onAiImagesPaste?.(imageFiles);
+        } catch (err) {
+          console.warn('无法从剪贴板读取图片', err);
+        }
+      }, 80);
+    }
+  };
+
+  const handleAiPaste = (event) => {
+    if (!canEdit || aiLoading) return;
+
+    const imageFiles = getClipboardImageFiles(event.clipboardData);
+
+    if (imageFiles.length === 0) return;
+
+    lastImagePasteAtRef.current = Date.now();
+    if (!event.clipboardData?.getData('text/plain')) {
+      event.preventDefault();
+    }
+    onAiImagesPaste?.(imageFiles);
   };
 
   const toolButtonClass = 'p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed';
@@ -231,11 +290,30 @@ const FileTree = ({
         </div>
 
         <form onSubmit={onAiSubmit} className="p-2 border-t border-slate-200/70 bg-slate-100">
+          {aiImages.length > 0 && (
+            <div className="mb-2 flex gap-1.5 overflow-x-auto rounded-lg border border-slate-200 bg-white p-1.5">
+              {aiImages.map((image) => (
+                <div key={image.id} className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100">
+                  <img src={image.dataUrl} alt={image.name} className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => onAiImageRemove?.(image.id)}
+                    disabled={aiLoading}
+                    className="absolute right-0.5 top-0.5 rounded-full bg-slate-950/75 p-0.5 text-white disabled:opacity-50"
+                    title="移除图片"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="relative">
             <textarea
               value={aiInput}
               onChange={(event) => onAiInputChange(event.target.value)}
               onKeyDown={handleAiKeyDown}
+              onPaste={handleAiPaste}
               disabled={!canEdit || aiLoading}
               rows={4}
               className="min-h-[68px] max-h-28 w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-300 disabled:opacity-60"
@@ -245,7 +323,7 @@ const FileTree = ({
           <div className="mt-1.5 flex justify-end">
             <button
               type="submit"
-              disabled={!canEdit || aiLoading || !aiInput.trim()}
+              disabled={!canEdit || aiLoading || (!aiInput.trim() && aiImages.length === 0)}
               className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md bg-indigo-500 px-3 text-[11px] font-black text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {aiLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

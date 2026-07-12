@@ -124,6 +124,11 @@ DB_NAME=teaching_p5js
 
 JWT_SECRET=replace_with_a_strong_secret
 
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_BASE_URL=https://relay.tigao123.top
+GEMINI_MODEL=gemini-3.5-flash
+GEMINI_MAX_OUTPUT_TOKENS=24576
+
 ALIYUN_ACCESS_KEY_ID=your_aliyun_access_key_id
 ALIYUN_ACCESS_KEY_SECRET=your_aliyun_access_key_secret
 ALIYUN_SMS_ENDPOINT=dypnsapi.aliyuncs.com
