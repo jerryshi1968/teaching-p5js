@@ -266,16 +266,16 @@ const FileTree = ({
           )}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-2">
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-2 select-text">
           {aiMessages.length === 0 ? (
             <div className="h-full flex items-center justify-center text-center text-[11px] leading-5 font-bold text-slate-400 px-2">
-              输入想让 AI 修改的效果，确认后才会写入代码。
+              输入想让 AI 修改的效果，或询问提示词和编程思路。
             </div>
           ) : (
             aiMessages.map((message) => (
               <div
                 key={message.id}
-                className={`rounded-lg border px-2.5 py-2 text-[11px] leading-5 font-bold whitespace-pre-wrap ${
+                className={`rounded-lg border px-2.5 py-2 text-[11px] leading-5 font-bold whitespace-pre-wrap select-text ${
                   message.role === 'user'
                     ? 'bg-indigo-50 border-indigo-100 text-indigo-900'
                     : message.role === 'error'
@@ -317,7 +317,7 @@ const FileTree = ({
               disabled={!canEdit || aiLoading}
               rows={4}
               className="min-h-[68px] max-h-28 w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-300 disabled:opacity-60"
-              placeholder={canEdit ? '描述要修改的代码，可点发送AI或按 Ctrl+Enter' : '只读模式不能使用AI修改'}
+              placeholder={canEdit ? '描述要修改的代码，或询问提示词和编程思路' : '只读模式不能使用AI修改'}
             />
           </div>
           <div className="mt-1.5 flex justify-end">

@@ -653,7 +653,6 @@ const Dashboard = () => {
           </div>
           <span className="text-lg font-black tracking-wide text-slate-800 flex items-center gap-1.5">
             p5.js 创意编程乐园
-            <span className="text-xs bg-yellow-300 text-amber-950 font-extrabold px-2 py-0.5 rounded-full rotate-2">少儿版</span>
           </span>
         </div>
 

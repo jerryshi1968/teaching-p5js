@@ -124,17 +124,21 @@ function buildSystemPrompt(existingFileNames) {
 
   return [
     '你是一个面向中小学生和教师 p5.js 教学网站的代码助手。',
-    '你只能修改 index.html、style.css、sketch.js 这三个文件。',
+    '如果必要，你只能修改 index.html、style.css、sketch.js 这三个文件。',
     'style.css 和 sketch.js 是可选文件；如果用户项目中不存在，不要因为缺失而报错，也不要强行创建，除非用户明确需要。',
     optionalNote ? `当前项目缺少这些可选文件：${optionalNote}。` : '',
     '必须保留已有中文注释和英文注释，不要删除、精简或改写任何已有注释。',
     '如果必须调整带行尾注释的代码，必须把原有行尾注释完整保留在修改后的代码旁边或上方。',
     `index.html 必须引用本站 p5.js 库：${P5_SCRIPT_TAG}，不要使用 cdnjs.cloudflare.com、unpkg、jsdelivr 或其他外部 p5.js CDN。`,
     '优先生成适合初学者理解的代码，不要引入复杂依赖。',
+    '如果用户需要修改程序，message 必须非常简短，不要复述用户提示词，不要写实现方案、代码规范或长篇解释。',
+    '如果用户需要修改程序，files 里只能放可运行的完整代码内容，不要把提示词、说明文字或 Markdown 放进任何文件。',
+    '如果只需要修改 sketch.js，就不要返回 index.html 或 style.css；只返回确实发生变化的文件。',
+    '如果用户是在询问写提示词、实现思路、编程建议或协商方案，并不需要修改程序，就只返回有帮助的 message，并让 files 为 {}。',
     '只返回严格 JSON，不要返回 Markdown、代码围栏或额外解释。',
     '只能返回一个 JSON 对象；不要在 JSON 对象前后追加任何文字，也不要连续返回多个 JSON 对象。',
     'JSON 格式必须是：{"message":"给用户看的简短说明","files":{"index.html":"完整内容","style.css":"完整内容","sketch.js":"完整内容"}}。',
-    'files 里只包含需要修改或创建的文件；未修改文件可以省略。'
+    'files 里只包含需要修改或创建的文件；未修改文件可以省略；没有代码修改时返回空对象 {}。'
   ].filter(Boolean).join('\n');
 }
 
@@ -184,6 +188,60 @@ function extractFirstJsonObject(content) {
   }
 
   return text.slice(start);
+}
+
+function extractPartialJsonStringProperty(rawContent, propertyName) {
+  const text = stripJsonFence(rawContent);
+  const key = `"${propertyName}"`;
+  const keyIndex = text.indexOf(key);
+  if (keyIndex === -1) return '';
+
+  let index = text.indexOf(':', keyIndex + key.length);
+  if (index === -1) return '';
+  index += 1;
+
+  while (index < text.length && /\s/.test(text[index])) index += 1;
+  if (text[index] !== '"') return '';
+  index += 1;
+
+  let value = '';
+  let escaped = false;
+  for (; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (escaped) {
+      if (char === 'n') value += '\n';
+      else if (char === 'r') value += '\r';
+      else if (char === 't') value += '\t';
+      else if (char === 'b') value += '\b';
+      else if (char === 'f') value += '\f';
+      else if (char === 'u') {
+        const hex = text.slice(index + 1, index + 5);
+        if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+          value += String.fromCharCode(parseInt(hex, 16));
+          index += 4;
+        }
+      } else {
+        value += char;
+      }
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') return value.trim();
+    value += char;
+  }
+
+  return value.trim();
+}
+
+function hasJsonProperty(rawContent, propertyName) {
+  return stripJsonFence(rawContent).includes(`"${propertyName}"`);
 }
 
 function parseAiJson(rawContent) {
@@ -298,15 +356,27 @@ exports.generateCodeSuggestion = async (req, res, next) => {
         rawContentTail: rawContent.slice(-1000)
       });
       if (finishReason === 'MAX_TOKENS') {
-        return res.status(502).json({ message: 'AI 返回内容过长被截断，请缩小修改范围或重试。' });
+        const partialMessage = extractPartialJsonStringProperty(rawContent, 'message');
+        if (partialMessage && !hasJsonProperty(rawContent, 'files')) {
+          return res.json({
+            message: `${partialMessage}\n\n[AI 返回内容过长，已显示可恢复的部分内容；当前 maxOutputTokens=${GEMINI_MAX_OUTPUT_TOKENS}。如需完整内容，请让 AI 分段输出。]`,
+            files: {},
+            model: AI_MODEL,
+            usage: {
+              usedTokens,
+              remainingTokens: Number(latestTokenBalance?.tokens || 0)
+            }
+          });
+        }
+        return res.status(502).json({ message: `AI 返回内容过长被截断，当前 maxOutputTokens=${GEMINI_MAX_OUTPUT_TOKENS}。请确认后端服务已重启，或让 AI 分段输出后再重试。` });
       }
       return res.status(502).json({ message: 'AI 返回的 JSON 格式异常，请再试一次。' });
     }
-    const suggestedFiles = normalizeAiFiles(parsed.files);
-
-    if (!parsed || typeof parsed !== 'object' || Object.keys(suggestedFiles).length === 0) {
-      return res.status(502).json({ message: 'AI 没有返回可应用的代码修改。' });
+    if (!parsed || typeof parsed !== 'object') {
+      return res.status(502).json({ message: 'AI 返回的 JSON 格式异常，请再试一次。' });
     }
+
+    const suggestedFiles = normalizeAiFiles(parsed.files);
 
     res.json({
       message: String(parsed.message || 'AI 已生成代码修改建议。'),
