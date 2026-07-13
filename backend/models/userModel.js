@@ -131,18 +131,60 @@ exports.getTokensById = async (id) => {
   return rows[0] || null;
 };
 
-exports.rechargeTokens = async ({ id, amount }) => {
-  const [result] = await db.query(
-    'UPDATE users SET tokens = tokens + ? WHERE id = ?',
-    [amount, id]
-  );
-  return result.affectedRows;
+exports.rechargeTokens = async ({ id, amount, operatorUserId = null }) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.query('SELECT tokens FROM users WHERE id = ? FOR UPDATE', [id]);
+    if (rows.length === 0) {
+      await connection.rollback();
+      return 0;
+    }
+    const balanceBefore = Number(rows[0].tokens || 0);
+    const balanceAfter = balanceBefore + amount;
+    const [result] = await connection.query(
+      'UPDATE users SET tokens = ? WHERE id = ?',
+      [balanceAfter, id]
+    );
+    await connection.query(
+      'INSERT INTO token_transactions (user_id, type, amount, balance_before, balance_after, operator_user_id, detail) VALUES (?, "recharge", ?, ?, ?, ?, ?)',
+      [id, amount, balanceBefore, balanceAfter, operatorUserId, JSON.stringify({ source: 'admin_recharge' })]
+    );
+    await connection.commit();
+    return result.affectedRows;
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 };
 
-exports.deductTokens = async ({ id, amount }) => {
-  const [result] = await db.query(
-    'UPDATE users SET tokens = tokens - ? WHERE id = ?',
-    [amount, id]
-  );
-  return result.affectedRows;
+exports.deductTokens = async ({ id, amount, detail = null }) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.query('SELECT tokens FROM users WHERE id = ? FOR UPDATE', [id]);
+    if (rows.length === 0) {
+      await connection.rollback();
+      return 0;
+    }
+    const balanceBefore = Number(rows[0].tokens || 0);
+    const balanceAfter = balanceBefore - amount;
+    const [result] = await connection.query(
+      'UPDATE users SET tokens = ? WHERE id = ?',
+      [balanceAfter, id]
+    );
+    await connection.query(
+      'INSERT INTO token_transactions (user_id, type, amount, balance_before, balance_after, detail) VALUES (?, "consume", ?, ?, ?, ?)',
+      [id, -amount, balanceBefore, balanceAfter, JSON.stringify(detail)]
+    );
+    await connection.commit();
+    return result.affectedRows;
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 };

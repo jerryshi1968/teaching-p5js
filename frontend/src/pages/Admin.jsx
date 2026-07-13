@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Edit2, Plus, Save, School, Trash2, Users, X } from 'lucide-react';
-import { createAdminClass, deleteAdminClass, fetchAdminClasses, fetchAdminClassStudents, fetchAdminTeachers, fetchAdminUsers, rechargeAdminUserTokens, removeAdminClassStudent, updateAdminClass, updateAdminUserRole } from '../services/api';
+import { ArrowLeft, ChevronLeft, ChevronRight, Edit2, History, Plus, Save, School, Trash2, Users, X } from 'lucide-react';
+import { createAdminClass, deleteAdminClass, fetchAdminClasses, fetchAdminClassStudents, fetchAdminTeachers, fetchAdminTokenTransactions, fetchAdminUsers, rechargeAdminUserTokens, removeAdminClassStudent, updateAdminClass, updateAdminUserRole } from '../services/api';
 
 const PAGE_SIZE = 10;
 
@@ -18,6 +18,14 @@ const Admin = () => {
   const [usernameKeyword, setUsernameKeyword] = useState('');
   const [roleUpdatingId, setRoleUpdatingId] = useState(null);
   const [tokenChargingId, setTokenChargingId] = useState(null);
+  const [tokenTransactions, setTokenTransactions] = useState([]);
+  const [tokenTransactionPage, setTokenTransactionPage] = useState(1);
+  const [tokenTransactionTotalPages, setTokenTransactionTotalPages] = useState(1);
+  const [tokenTransactionTotal, setTokenTransactionTotal] = useState(0);
+  const [tokenTransactionLoading, setTokenTransactionLoading] = useState(false);
+  const [tokenTransactionError, setTokenTransactionError] = useState('');
+  const [tokenTransactionSearchInput, setTokenTransactionSearchInput] = useState('');
+  const [tokenTransactionUsername, setTokenTransactionUsername] = useState('');
   const [classes, setClasses] = useState([]);
   const [classPage, setClassPage] = useState(1);
   const [classTotalPages, setClassTotalPages] = useState(1);
@@ -92,6 +100,25 @@ const Admin = () => {
   }, [activeMenu, classPage, currentUser]);
 
   useEffect(() => {
+    if (currentUser?.role !== 'admin' || activeMenu !== 'tokenTransactions') return;
+
+    setTokenTransactionLoading(true);
+    setTokenTransactionError('');
+    fetchAdminTokenTransactions(tokenTransactionPage, tokenTransactionUsername)
+      .then(data => {
+        setTokenTransactions(Array.isArray(data.items) ? data.items : []);
+        setTokenTransactionTotal(Number(data.total || 0));
+        setTokenTransactionTotalPages(Math.max(1, Number(data.totalPages || 1)));
+      })
+      .catch(err => {
+        setTokenTransactionError(err.message || '获取 Token 记录失败，请重试。');
+      })
+      .finally(() => {
+        setTokenTransactionLoading(false);
+      });
+  }, [activeMenu, currentUser, tokenTransactionPage, tokenTransactionUsername]);
+
+  useEffect(() => {
     if (currentUser?.role !== 'admin' || activeMenu !== 'classes') return;
 
     fetchAdminTeachers()
@@ -133,6 +160,12 @@ const Admin = () => {
     e.preventDefault();
     setPage(1);
     setUsernameKeyword(searchInput.trim());
+  };
+
+  const handleTokenTransactionSearch = (e) => {
+    e.preventDefault();
+    setTokenTransactionPage(1);
+    setTokenTransactionUsername(tokenTransactionSearchInput.trim());
   };
 
   const handleRoleChange = async (user, role) => {
@@ -338,9 +371,29 @@ const Admin = () => {
     return `无效：${user.class_code}`;
   };
 
+  const formatTokenTransactionDetail = (detail) => {
+    if (!detail) return '-';
+    let parsedDetail = detail;
+    if (typeof detail === 'string') {
+      try {
+        parsedDetail = JSON.parse(detail);
+      } catch (err) {
+        return detail;
+      }
+    }
+    if (!parsedDetail || typeof parsedDetail !== 'object') return '-';
+    const parts = [];
+    if (parsedDetail.source === 'admin_recharge') parts.push('管理员充值');
+    if (parsedDetail.source === 'ai_code_suggestion') parts.push('AI 代码建议');
+    if (parsedDetail.projectId) parts.push(`项目：${parsedDetail.projectId}`);
+    if (parsedDetail.model) parts.push(`模型：${parsedDetail.model}`);
+    return parts.length > 0 ? parts.join('；') : JSON.stringify(parsedDetail);
+  };
+
   const menuItems = [
     { key: 'users', label: '用户管理', icon: Users },
-    { key: 'classes', label: '班级管理', icon: School }
+    { key: 'classes', label: '班级管理', icon: School },
+    { key: 'tokenTransactions', label: 'Token 记录', icon: History }
   ];
 
   return (
@@ -386,13 +439,16 @@ const Admin = () => {
         <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between">
           <div>
             <h2 className="text-base font-black text-slate-900">
-              {activeMenu === 'users' ? '用户管理' : '班级管理'}
+              {activeMenu === 'users' ? '用户管理' : activeMenu === 'tokenTransactions' ? 'Token 记录' : '班级管理'}
             </h2>
             {activeMenu === 'users' && (
               <p className="text-xs text-slate-400 font-bold mt-0.5">共 {total} 个用户</p>
             )}
             {activeMenu === 'classes' && (
               <p className="text-xs text-slate-400 font-bold mt-0.5">共 {classTotal} 个班级</p>
+            )}
+            {activeMenu === 'tokenTransactions' && (
+              <p className="text-xs text-slate-400 font-bold mt-0.5">共 {tokenTransactionTotal} 条记录</p>
             )}
           </div>
           {activeMenu === 'users' && (
@@ -436,6 +492,37 @@ const Admin = () => {
               <Plus className="w-4 h-4" />
               <span>新建班级</span>
             </button>
+          )}
+          {activeMenu === 'tokenTransactions' && (
+            <form onSubmit={handleTokenTransactionSearch} className="flex items-center gap-2">
+              <input
+                type="search"
+                value={tokenTransactionSearchInput}
+                onChange={(e) => setTokenTransactionSearchInput(e.target.value)}
+                className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                placeholder="按用户名过滤"
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+                disabled={tokenTransactionLoading}
+              >
+                查找
+              </button>
+              {tokenTransactionUsername && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTokenTransactionSearchInput('');
+                    setTokenTransactionUsername('');
+                    setTokenTransactionPage(1);
+                  }}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-500 transition hover:bg-slate-100"
+                >
+                  清空
+                </button>
+              )}
+            </form>
           )}
         </header>
 
@@ -529,6 +616,87 @@ const Admin = () => {
                     type="button"
                     onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                     disabled={page >= totalPages || loading}
+                    className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white"
+                    title="下一页"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : activeMenu === 'tokenTransactions' ? (
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100 text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-black">发生时间</th>
+                      <th className="px-4 py-3 text-left font-black">用户</th>
+                      <th className="px-4 py-3 text-left font-black">用户 ID</th>
+                      <th className="px-4 py-3 text-left font-black">类型</th>
+                      <th className="px-4 py-3 text-right font-black">变动量</th>
+                      <th className="px-4 py-3 text-right font-black">变动前</th>
+                      <th className="px-4 py-3 text-right font-black">变动后</th>
+                      <th className="px-4 py-3 text-left font-black">操作人</th>
+                      <th className="px-4 py-3 text-left font-black">详情</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {tokenTransactionLoading ? (
+                      <tr>
+                        <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="9">加载中...</td>
+                      </tr>
+                    ) : tokenTransactionError ? (
+                      <tr>
+                        <td className="px-4 py-10 text-center text-rose-500 font-bold" colSpan="9">{tokenTransactionError}</td>
+                      </tr>
+                    ) : tokenTransactions.length === 0 ? (
+                      <tr>
+                        <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="9">暂无 Token 记录</td>
+                      </tr>
+                    ) : (
+                      tokenTransactions.map((transaction) => (
+                        <tr key={transaction.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 whitespace-nowrap text-slate-600">{formatDateTime(transaction.created_at)}</td>
+                          <td className="px-4 py-3 font-bold text-slate-800">{transaction.username || '-'}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-slate-600">{transaction.user_id}</td>
+                          <td className="px-4 py-3">
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-black ${transaction.type === 'recharge' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                              {transaction.type === 'recharge' ? '充值' : '消耗'}
+                            </span>
+                          </td>
+                          <td className={`px-4 py-3 text-right font-mono text-xs font-bold ${Number(transaction.amount) >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {Number(transaction.amount) >= 0 ? '+' : ''}{Number(transaction.amount || 0).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(transaction.balance_before || 0).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right font-mono text-xs font-bold text-slate-700">{Number(transaction.balance_after || 0).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {transaction.operator_username ? `${transaction.operator_username}（${transaction.operator_user_id}）` : '-'}
+                          </td>
+                          <td className="px-4 py-3 min-w-72 text-xs leading-5 text-slate-600">{formatTokenTransactionDetail(transaction.detail)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400">第 {tokenTransactionPage} / {tokenTransactionTotalPages} 页</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTokenTransactionPage((current) => Math.max(1, current - 1))}
+                    disabled={tokenTransactionPage <= 1 || tokenTransactionLoading}
+                    className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white"
+                    title="上一页"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTokenTransactionPage((current) => Math.min(tokenTransactionTotalPages, current + 1))}
+                    disabled={tokenTransactionPage >= tokenTransactionTotalPages || tokenTransactionLoading}
                     className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white"
                     title="下一页"
                   >

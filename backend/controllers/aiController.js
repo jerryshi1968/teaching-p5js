@@ -275,7 +275,15 @@ exports.generateCodeSuggestion = async (req, res, next) => {
 
     const usedTokens = getUsedTokens(data?.usageMetadata);
     if (usedTokens > 0) {
-      await User.deductTokens({ id: req.user.id, amount: usedTokens });
+      await User.deductTokens({
+        id: req.user.id,
+        amount: usedTokens,
+        detail: {
+          source: 'ai_code_suggestion',
+          projectId,
+          model: AI_MODEL
+        }
+      });
     }
     const latestTokenBalance = await User.getTokensById(req.user.id);
     let parsed = null;

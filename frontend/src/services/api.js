@@ -226,6 +226,29 @@ export const rechargeAdminUserTokens = async (userId, amount) => {
   return data;
 };
 
+export const fetchAdminTokenTransactions = async (page = 1, username = '') => {
+  const params = new URLSearchParams({
+    page: String(page)
+  });
+  if (username.trim()) {
+    params.set('username', username.trim());
+  }
+
+  const response = await fetch(`/api/admin/token-transactions?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    }
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权访问 Token 记录。');
+  }
+  if (!response.ok) throw new Error(data?.message || `获取 Token 记录失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
 export const fetchMyClasses = async () => {
   const response = await fetch('/api/auth/my-classes', {
     method: 'GET',

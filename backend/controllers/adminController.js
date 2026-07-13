@@ -1,5 +1,6 @@
 const User = require('../models/userModel');
 const Class = require('../models/classModel');
+const TokenTransaction = require('../models/tokenTransactionModel');
 
 const CLASS_CODE_PATTERN = /^[A-Za-z0-9]{4,10}$/;
 
@@ -120,13 +121,38 @@ exports.rechargeUserTokens = async (req, res, next) => {
       return res.status(404).json({ message: '用户不存在。' });
     }
 
-    await User.rechargeTokens({ id: userId, amount });
+    await User.rechargeTokens({ id: userId, amount, operatorUserId: req.user.id });
     const updatedUser = await User.findById(userId);
 
     res.json({
       user: updatedUser,
       tokens: Number(updatedUser?.tokens || 0),
       message: 'Token 充值成功。'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.listTokenTransactions = async (req, res, next) => {
+  try {
+    const rawPage = Number.parseInt(req.query.page, 10);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const pageSize = 15;
+    const offset = (page - 1) * pageSize;
+    const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
+
+    const [items, total] = await Promise.all([
+      TokenTransaction.listPaginated({ limit: pageSize, offset, username }),
+      TokenTransaction.count({ username })
+    ]);
+
+    res.json({
+      items,
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize)
     });
   } catch (err) {
     next(err);
