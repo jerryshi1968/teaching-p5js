@@ -13,6 +13,25 @@ exports.listForUser = async (userId, parentId = null) => {
   return rows;
 };
 
+exports.listAdminPaginated = async ({ limit, offset, authorName = '' }) => {
+  const keyword = authorName.trim();
+  const whereClause = keyword ? ' WHERE u.username LIKE ?' : '';
+  const params = keyword ? [`%${keyword}%`, limit, offset] : [limit, offset];
+  const [rows] = await db.query(
+    `SELECT p.id, p.name, u.username AS author_name, p.created_at FROM projects p JOIN users u ON p.user_id = u.id${whereClause} ORDER BY p.created_at DESC, p.id DESC LIMIT ? OFFSET ?`,
+    params
+  );
+  return rows;
+};
+
+exports.countAdminProjects = async ({ authorName = '' } = {}) => {
+  const keyword = authorName.trim();
+  const whereClause = keyword ? ' WHERE u.username LIKE ?' : '';
+  const params = keyword ? [`%${keyword}%`] : [];
+  const [rows] = await db.query(`SELECT COUNT(*) AS total FROM projects p JOIN users u ON p.user_id = u.id${whereClause}`, params);
+  return Number(rows[0]?.total || 0);
+};
+
 exports.listVisibleToUser = async ({ currentUser, studentId, parentId = null }) => {
   if (!studentId) {
     return exports.listForUser(currentUser.id, parentId);

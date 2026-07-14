@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Edit2, History, Plus, Save, School, Trash2, Users, X } from 'lucide-react';
-import { createAdminClass, deleteAdminClass, fetchAdminClasses, fetchAdminClassStudents, fetchAdminTeachers, fetchAdminTokenTransactions, fetchAdminUsers, rechargeAdminUserTokens, removeAdminClassStudent, updateAdminClass, updateAdminUserRole } from '../services/api';
+import { ArrowLeft, ChevronLeft, ChevronRight, Edit2, ExternalLink, FileCode, History, Plus, Save, School, Trash2, Users, X } from 'lucide-react';
+import { createAdminClass, deleteAdminClass, fetchAdminClasses, fetchAdminClassStudents, fetchAdminProjects, fetchAdminTeachers, fetchAdminTokenTransactions, fetchAdminUsers, rechargeAdminUserTokens, removeAdminClassStudent, updateAdminClass, updateAdminUserRole } from '../services/api';
 
 const PAGE_SIZE = 10;
 
@@ -26,6 +26,14 @@ const Admin = () => {
   const [tokenTransactionError, setTokenTransactionError] = useState('');
   const [tokenTransactionSearchInput, setTokenTransactionSearchInput] = useState('');
   const [tokenTransactionUsername, setTokenTransactionUsername] = useState('');
+  const [projects, setProjects] = useState([]);
+  const [projectPage, setProjectPage] = useState(1);
+  const [projectTotalPages, setProjectTotalPages] = useState(1);
+  const [projectTotal, setProjectTotal] = useState(0);
+  const [projectLoading, setProjectLoading] = useState(false);
+  const [projectError, setProjectError] = useState('');
+  const [projectAuthorSearchInput, setProjectAuthorSearchInput] = useState('');
+  const [projectAuthorName, setProjectAuthorName] = useState('');
   const [classes, setClasses] = useState([]);
   const [classPage, setClassPage] = useState(1);
   const [classTotalPages, setClassTotalPages] = useState(1);
@@ -119,6 +127,25 @@ const Admin = () => {
   }, [activeMenu, currentUser, tokenTransactionPage, tokenTransactionUsername]);
 
   useEffect(() => {
+    if (currentUser?.role !== 'admin' || activeMenu !== 'projects') return;
+
+    setProjectLoading(true);
+    setProjectError('');
+    fetchAdminProjects(projectPage, projectAuthorName)
+      .then(data => {
+        setProjects(Array.isArray(data.items) ? data.items : []);
+        setProjectTotal(Number(data.total || 0));
+        setProjectTotalPages(Math.max(1, Number(data.totalPages || 1)));
+      })
+      .catch(err => {
+        setProjectError(err.message || '获取作品列表失败，请重试。');
+      })
+      .finally(() => {
+        setProjectLoading(false);
+      });
+  }, [activeMenu, currentUser, projectPage, projectAuthorName]);
+
+  useEffect(() => {
     if (currentUser?.role !== 'admin' || activeMenu !== 'classes') return;
 
     fetchAdminTeachers()
@@ -166,6 +193,16 @@ const Admin = () => {
     e.preventDefault();
     setTokenTransactionPage(1);
     setTokenTransactionUsername(tokenTransactionSearchInput.trim());
+  };
+
+  const handleProjectSearch = (e) => {
+    e.preventDefault();
+    setProjectPage(1);
+    setProjectAuthorName(projectAuthorSearchInput.trim());
+  };
+
+  const handleOpenProjectPreview = (projectId) => {
+    window.open(`/teaching-p5js/projects/${encodeURIComponent(projectId)}/index.html?t=${Date.now()}`, '_blank');
   };
 
   const handleRoleChange = async (user, role) => {
@@ -393,6 +430,7 @@ const Admin = () => {
   const menuItems = [
     { key: 'users', label: '用户管理', icon: Users },
     { key: 'classes', label: '班级管理', icon: School },
+    { key: 'projects', label: '作品管理', icon: FileCode },
     { key: 'tokenTransactions', label: 'Token 记录', icon: History }
   ];
 
@@ -439,13 +477,16 @@ const Admin = () => {
         <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between">
           <div>
             <h2 className="text-base font-black text-slate-900">
-              {activeMenu === 'users' ? '用户管理' : activeMenu === 'tokenTransactions' ? 'Token 记录' : '班级管理'}
+              {activeMenu === 'users' ? '用户管理' : activeMenu === 'projects' ? '作品管理' : activeMenu === 'tokenTransactions' ? 'Token 记录' : '班级管理'}
             </h2>
             {activeMenu === 'users' && (
               <p className="text-xs text-slate-400 font-bold mt-0.5">共 {total} 个用户</p>
             )}
             {activeMenu === 'classes' && (
               <p className="text-xs text-slate-400 font-bold mt-0.5">共 {classTotal} 个班级</p>
+            )}
+            {activeMenu === 'projects' && (
+              <p className="text-xs text-slate-400 font-bold mt-0.5">共 {projectTotal} 个作品</p>
             )}
             {activeMenu === 'tokenTransactions' && (
               <p className="text-xs text-slate-400 font-bold mt-0.5">共 {tokenTransactionTotal} 条记录</p>
@@ -492,6 +533,37 @@ const Admin = () => {
               <Plus className="w-4 h-4" />
               <span>新建班级</span>
             </button>
+          )}
+          {activeMenu === 'projects' && (
+            <form onSubmit={handleProjectSearch} className="flex items-center gap-2">
+              <input
+                type="search"
+                value={projectAuthorSearchInput}
+                onChange={(e) => setProjectAuthorSearchInput(e.target.value)}
+                className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                placeholder="按作者名过滤"
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+                disabled={projectLoading}
+              >
+                查找
+              </button>
+              {projectAuthorName && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProjectAuthorSearchInput('');
+                    setProjectAuthorName('');
+                    setProjectPage(1);
+                  }}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-500 transition hover:bg-slate-100"
+                >
+                  清空
+                </button>
+              )}
+            </form>
           )}
           {activeMenu === 'tokenTransactions' && (
             <form onSubmit={handleTokenTransactionSearch} className="flex items-center gap-2">
@@ -616,6 +688,80 @@ const Admin = () => {
                     type="button"
                     onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                     disabled={page >= totalPages || loading}
+                    className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white"
+                    title="下一页"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : activeMenu === 'projects' ? (
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100 text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-black">作品 ID</th>
+                      <th className="px-4 py-3 text-left font-black">作品名称</th>
+                      <th className="px-4 py-3 text-left font-black">作者名</th>
+                      <th className="px-4 py-3 text-left font-black">创建时间</th>
+                      <th className="px-4 py-3 text-right font-black">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {projectLoading ? (
+                      <tr>
+                        <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="5">加载中...</td>
+                      </tr>
+                    ) : projectError ? (
+                      <tr>
+                        <td className="px-4 py-10 text-center text-rose-500 font-bold" colSpan="5">{projectError}</td>
+                      </tr>
+                    ) : projects.length === 0 ? (
+                      <tr>
+                        <td className="px-4 py-10 text-center text-slate-400 font-bold" colSpan="5">暂无作品</td>
+                      </tr>
+                    ) : (
+                      projects.map((project) => (
+                        <tr key={project.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-mono text-xs text-slate-600">{project.id}</td>
+                          <td className="px-4 py-3 font-bold text-slate-800">{project.name || '-'}</td>
+                          <td className="px-4 py-3 text-slate-600">{project.author_name || '-'}</td>
+                          <td className="px-4 py-3 text-slate-600">{formatDateTime(project.created_at)}</td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenProjectPreview(project.id)}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              <span>查看</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400">第 {projectPage} / {projectTotalPages} 页</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProjectPage((current) => Math.max(1, current - 1))}
+                    disabled={projectPage <= 1 || projectLoading}
+                    className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white"
+                    title="上一页"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProjectPage((current) => Math.min(projectTotalPages, current + 1))}
+                    disabled={projectPage >= projectTotalPages || projectLoading}
                     className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white"
                     title="下一页"
                   >

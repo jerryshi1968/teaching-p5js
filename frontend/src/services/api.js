@@ -249,6 +249,29 @@ export const fetchAdminTokenTransactions = async (page = 1, username = '') => {
   return data;
 };
 
+export const fetchAdminProjects = async (page = 1, authorName = '') => {
+  const params = new URLSearchParams({
+    page: String(page)
+  });
+  if (authorName.trim()) {
+    params.set('authorName', authorName.trim());
+  }
+
+  const response = await fetch(`/api/admin/projects?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    }
+  });
+  const data = await response.json();
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(data?.message || '无权访问作品列表。');
+  }
+  if (!response.ok) throw new Error(data?.message || `获取作品列表失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
 export const fetchMyClasses = async () => {
   const response = await fetch('/api/auth/my-classes', {
     method: 'GET',

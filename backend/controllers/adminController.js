@@ -1,5 +1,6 @@
 const User = require('../models/userModel');
 const Class = require('../models/classModel');
+const Project = require('../models/projectModel');
 const TokenTransaction = require('../models/tokenTransactionModel');
 
 const CLASS_CODE_PATTERN = /^[A-Za-z0-9]{4,10}$/;
@@ -145,6 +146,31 @@ exports.listTokenTransactions = async (req, res, next) => {
     const [items, total] = await Promise.all([
       TokenTransaction.listPaginated({ limit: pageSize, offset, username }),
       TokenTransaction.count({ username })
+    ]);
+
+    res.json({
+      items,
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize)
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.listProjects = async (req, res, next) => {
+  try {
+    const rawPage = Number.parseInt(req.query.page, 10);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const pageSize = 10;
+    const offset = (page - 1) * pageSize;
+    const authorName = typeof req.query.authorName === 'string' ? req.query.authorName.trim() : '';
+
+    const [items, total] = await Promise.all([
+      Project.listAdminPaginated({ limit: pageSize, offset, authorName }),
+      Project.countAdminProjects({ authorName })
     ]);
 
     res.json({

@@ -9,6 +9,7 @@ router.put('/users/:id/role', authMiddleware, adminMiddleware, adminController.u
 router.post('/users/:id/tokens/recharge', authMiddleware, adminMiddleware, adminController.rechargeUserTokens);
 router.patch('/users/:id/tokens/recharge', authMiddleware, adminMiddleware, adminController.rechargeUserTokens);
 router.get('/token-transactions', authMiddleware, adminMiddleware, adminController.listTokenTransactions);
+router.get('/projects', authMiddleware, adminMiddleware, adminController.listProjects);
 router.get('/teachers', authMiddleware, adminMiddleware, adminController.listTeachers);
 router.get('/classes', authMiddleware, adminMiddleware, adminController.listClasses);
 router.post('/classes', authMiddleware, adminMiddleware, adminController.createClass);
