@@ -70,7 +70,7 @@ const AppDialog = ({ options, onResolve }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm">
+    <div data-i18n-skip={options.disableAutoTranslate ? '' : undefined} className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-[2rem] border-4 border-white bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.20)]">
         <div className="flex items-start gap-4">
           <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-2 ${styles.iconWrap}`}>

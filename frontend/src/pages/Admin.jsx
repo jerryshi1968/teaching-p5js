@@ -631,9 +631,11 @@ const Admin = () => {
                     ) : (
                       users.map((user) => (
                         <tr key={user.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 font-bold text-slate-800">{user.username || '-'}</td>
+                          <td className="px-4 py-3 font-bold text-slate-800"><span data-i18n-skip>{user.username || '-'}</span></td>
                           <td className="px-4 py-3 text-slate-600">{user.phone || '-'}</td>
-                          <td className={`px-4 py-3 ${user.class_code && !user.class_name ? 'text-rose-500 font-bold' : 'text-slate-600'}`}>{formatUserClass(user)}</td>
+                          <td className={`px-4 py-3 ${user.class_code && !user.class_name ? 'text-rose-500 font-bold' : 'text-slate-600'}`}>
+                            {user.class_name ? <span data-i18n-skip>{user.class_name}</span> : formatUserClass(user)}
+                          </td>
                           <td className="px-4 py-3 text-slate-600">{formatGender(user.gender)}</td>
                           <td className="px-4 py-3 text-slate-600">{formatDate(user.birthday)}</td>
                           <td className="px-4 py-3 text-slate-600">
@@ -726,8 +728,8 @@ const Admin = () => {
                       projects.map((project) => (
                         <tr key={project.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 font-mono text-xs text-slate-600">{project.id}</td>
-                          <td className="px-4 py-3 font-bold text-slate-800">{project.name || '-'}</td>
-                          <td className="px-4 py-3 text-slate-600">{project.author_name || '-'}</td>
+                          <td className="px-4 py-3 font-bold text-slate-800"><span data-i18n-skip>{project.name || '-'}</span></td>
+                          <td className="px-4 py-3 text-slate-600"><span data-i18n-skip>{project.author_name || '-'}</span></td>
                           <td className="px-4 py-3 text-slate-600">{formatDateTime(project.created_at)}</td>
                           <td className="px-4 py-3 text-right">
                             <button
@@ -804,7 +806,7 @@ const Admin = () => {
                       tokenTransactions.map((transaction) => (
                         <tr key={transaction.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 whitespace-nowrap text-slate-600">{formatDateTime(transaction.created_at)}</td>
-                          <td className="px-4 py-3 font-bold text-slate-800">{transaction.username || '-'}</td>
+                          <td className="px-4 py-3 font-bold text-slate-800"><span data-i18n-skip>{transaction.username || '-'}</span></td>
                           <td className="px-4 py-3 font-mono text-xs text-slate-600">{transaction.user_id}</td>
                           <td className="px-4 py-3">
                             <span className={`rounded-full px-2.5 py-1 text-xs font-black ${transaction.type === 'recharge' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
@@ -817,7 +819,7 @@ const Admin = () => {
                           <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(transaction.balance_before || 0).toLocaleString()}</td>
                           <td className="px-4 py-3 text-right font-mono text-xs font-bold text-slate-700">{Number(transaction.balance_after || 0).toLocaleString()}</td>
                           <td className="px-4 py-3 text-slate-600">
-                            {transaction.operator_username ? `${transaction.operator_username}（${transaction.operator_user_id}）` : '-'}
+                            <span data-i18n-skip>{transaction.operator_username ? `${transaction.operator_username}（${transaction.operator_user_id}）` : '-'}</span>
                           </td>
                           <td className="px-4 py-3 min-w-72 text-xs leading-5 text-slate-600">{formatTokenTransactionDetail(transaction.detail)}</td>
                         </tr>
@@ -881,16 +883,16 @@ const Admin = () => {
                     ) : (
                       classes.map((classItem) => (
                         <tr key={classItem.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 font-bold text-slate-800">{classItem.name || '-'}</td>
+                          <td className="px-4 py-3 font-bold text-slate-800"><span data-i18n-skip>{classItem.name || '-'}</span></td>
                           <td className="px-4 py-3 text-slate-600">{classItem.class_code || '-'}</td>
-                          <td className="px-4 py-3 text-slate-600">{classItem.teacher_name || '-'}</td>
+                          <td className="px-4 py-3 text-slate-600"><span data-i18n-skip>{classItem.teacher_name || '-'}</span></td>
                           <td className="px-4 py-3">
                             <button
                               type="button"
                               onClick={() => openClassStudentsDialog(classItem)}
                               className="rounded-lg bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
                             >
-                              {Number(classItem.student_count || 0)} 人
+                              {Number(classItem.student_count || 0)} <span>人</span>
                             </button>
                           </td>
                           <td className="px-4 py-3 text-slate-600">{formatDateTime(classItem.created_at)}</td>
@@ -955,7 +957,7 @@ const Admin = () => {
           <div className="w-full max-w-5xl rounded-lg bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <div>
-                <h3 className="text-base font-black text-slate-900">{classStudentsDialog.name} 学生列表</h3>
+                <h3 className="text-base font-black text-slate-900"><span data-i18n-skip>{classStudentsDialog.name}</span> 学生列表</h3>
                 <p className="mt-1 text-xs font-bold text-slate-400">班级码：{classStudentsDialog.class_code || '-'}</p>
               </div>
               <button
@@ -996,7 +998,7 @@ const Admin = () => {
                   ) : (
                     classStudents.map((student) => (
                       <tr key={student.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 font-bold text-slate-800">{student.username || '-'}</td>
+                        <td className="px-4 py-3 font-bold text-slate-800"><span data-i18n-skip>{student.username || '-'}</span></td>
                         <td className="px-4 py-3 text-slate-600">{student.phone || '-'}</td>
                         <td className="px-4 py-3 text-slate-600">{formatGender(student.gender)}</td>
                         <td className="px-4 py-3 text-slate-600">{formatDate(student.birthday)}</td>
@@ -1069,7 +1071,7 @@ const Admin = () => {
                 >
                   <option value="">请选择教师</option>
                   {teachers.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>{teacher.username}</option>
+                    <option data-i18n-skip key={teacher.id} value={teacher.id}>{teacher.username}</option>
                   ))}
                 </select>
               </label>

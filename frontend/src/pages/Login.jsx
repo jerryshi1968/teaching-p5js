@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, KeyRound, AlertCircle, Smile, Sparkles, Star, Rocket, Phone, Users, CalendarDays } from 'lucide-react';
 import { useAppDialog } from '../hooks/useAppDialog';
 import SmsCodeField from '../components/Common/SmsCodeField';
+import LanguageSelect from '../components/Common/LanguageSelect';
 
 const currentYear = new Date().getFullYear();
 const birthdayYears = Array.from({ length: 30 }, (_, index) => currentYear - index);
@@ -159,6 +160,7 @@ const Login = () => {
     <>
     {appDialog.dialog}
     <div className="min-h-screen bg-gradient-to-br from-sky-200 via-indigo-100 to-pink-100 flex items-center justify-center p-4 relative overflow-y-auto overflow-x-hidden font-sans">
+      <LanguageSelect className="absolute right-4 top-4 z-20" />
       
       {/* 背景装饰性卡通泡泡/星星，增加画面丰富度 */}
       <div className="absolute top-12 left-12 w-16 h-16 bg-yellow-200/60 rounded-full blur-lg animate-pulse" />

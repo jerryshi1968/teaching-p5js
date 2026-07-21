@@ -699,7 +699,7 @@ const EditorView = () => {
               创意项目
             </span>
             <span className="font-black text-sm truncate max-w-[260px] text-slate-700">
-              {projectName}
+              <span data-i18n-skip>{projectName}</span>
             </span>
             {!canEdit && (
               <span className="text-[10px] bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full font-black">

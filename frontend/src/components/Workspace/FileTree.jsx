@@ -210,7 +210,7 @@ const FileTree = ({
                 title={file.path}
               >
                 {getFileIcon(file)}
-                <span className="truncate font-bold">{file.name}</span>
+                <span data-i18n-skip className="truncate font-bold">{file.name}</span>
               </button>
 
               <button

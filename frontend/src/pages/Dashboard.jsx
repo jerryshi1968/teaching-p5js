@@ -5,6 +5,8 @@ import { ArrowDown, ArrowUp, Folder, MoveRight, Plus, Trash2, Calendar, User, Lo
 import { fetchMyProjects, copyProject, distributeProjectToClass, fetchMyClasses, fetchStudentsByClass, fetchProjectGroups, fetchAllProjectGroups, createProjectGroup, updateProjectGroup, moveProjectGroup, reorderProjectGroups, deleteProjectGroup, moveProject, reorderProjects } from '../services/api';
 import { useAppDialog } from '../hooks/useAppDialog';
 import ProfileDialog from '../components/Common/ProfileDialog';
+import LanguageSelect from '../components/Common/LanguageSelect';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const DASHBOARD_SELECTED_CLASS_KEY = 'teaching_dashboard_selected_class_code';
 const DASHBOARD_SELECTED_STUDENT_KEY = 'teaching_dashboard_selected_student_id';
@@ -16,6 +18,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const appDialog = useAppDialog();
+  const { isEnglish } = useLanguage();
   const [projects, setProjects] = useState([]);
   const [projectGroups, setProjectGroups] = useState([]);
   const [breadcrumbs, setBreadcrumbs] = useState([]);
@@ -316,9 +319,10 @@ const Dashboard = () => {
   const handleDeleteGroup = async (e, group) => {
     e.stopPropagation();
     const confirmed = await appDialog.confirm({
-      title: '删除作品组',
-      message: `确定要删除作品组「${group.name}」吗？只有空作品组可以删除。`,
-      confirmText: '删除作品组',
+      disableAutoTranslate: true,
+      title: isEnglish ? 'Delete Project Group' : '删除作品组',
+      message: isEnglish ? `Delete project group "${group.name}"? Only empty project groups can be deleted.` : `确定要删除作品组「${group.name}」吗？只有空作品组可以删除。`,
+      confirmText: isEnglish ? 'Delete Project Group' : '删除作品组',
       tone: 'danger'
     });
     if (!confirmed) return;
@@ -433,9 +437,10 @@ const Dashboard = () => {
   const handleDeleteProject = async (e, id) => {
     e.stopPropagation(); // 阻止卡片点击跳转到编辑页
     const confirmed = await appDialog.confirm({
-      title: '删除作品',
-      message: '⚠️ 确定要跟这个心爱的小作品说再见吗？一旦删除就无法找回了哦！',
-      confirmText: '删除作品',
+      disableAutoTranslate: true,
+      title: isEnglish ? 'Delete Project' : '删除作品',
+      message: isEnglish ? '⚠️ Are you sure you want to delete this project? Once deleted, it cannot be recovered.' : '⚠️ 确定要跟这个心爱的小作品说再见吗？一旦删除就无法找回了哦！',
+      confirmText: isEnglish ? 'Delete Project' : '删除作品',
       tone: 'danger'
     });
     if (!confirmed) return;
@@ -450,13 +455,13 @@ const Dashboard = () => {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || '删除项目失败了，再试一次吧！');
+      if (!response.ok) throw new Error(data.message || (isEnglish ? 'Failed to delete the project. Please try again.' : '删除项目失败了，再试一次吧！'));
 
       // 更新前端状态列表
       setProjects(projects.filter(p => p.id !== id));
     } catch (err) {
       await appDialog.alert({
-        title: '删除失败',
+        title: isEnglish ? 'Delete Failed' : '删除失败',
         message: err.message
       });
     }
@@ -500,12 +505,13 @@ const Dashboard = () => {
   
   const handleCopyProject = async (e, project) => {
     e.stopPropagation();
-    const studentName = findSelectedStudent()?.username || '学生';
+    const studentName = findSelectedStudent()?.username || (isEnglish ? 'Student' : '学生');
     const confirmed = await appDialog.confirm({
-      title: '复制到我的项目',
-      message: `确定要把「${project.name}」复制成自己的项目吗？`,
-      highlight: `复制后的名称为：${project.name} - 来自${studentName}`,
-      confirmText: '复制项目'
+      disableAutoTranslate: true,
+      title: isEnglish ? 'Copy to My Projects' : '复制到我的项目',
+      message: isEnglish ? `Do you want to copy "${project.name}" to your own projects?` : `确定要把「${project.name}」复制成自己的项目吗？`,
+      highlight: isEnglish ? `Copied project name: ${project.name} - from ${studentName}` : `复制后的名称为：${project.name} - 来自${studentName}`,
+      confirmText: isEnglish ? 'Copy Project' : '复制项目'
     });
     if (!confirmed) return;
 
@@ -518,7 +524,7 @@ const Dashboard = () => {
       setSelectedStudentId('me');
     } catch (err) {
       await appDialog.alert({
-        title: '复制失败',
+        title: isEnglish ? 'Copy Failed' : '复制失败',
         message: err.message
       });
     } finally {
@@ -532,17 +538,19 @@ const Dashboard = () => {
     const selectedClass = findSelectedClass();
     if (!selectedClass) {
       await appDialog.alert({
-        title: '无法分发',
-        message: '请先在上方选择一个班级，再分发项目。'
+        disableAutoTranslate: true,
+        title: isEnglish ? 'Cannot Distribute' : '无法分发',
+        message: isEnglish ? 'Please select a class above before distributing the project.' : '请先在上方选择一个班级，再分发项目。'
       });
       return;
     }
 
     const confirmed = await appDialog.confirm({
-      title: '分发给班级',
-      message: `确定将「${project.name}」分发给「${selectedClass.name}」的所有学生吗？`,
-      highlight: `学生刷新后会在根作品组看到：来自${currentUser?.username || '老师'} - ${project.name}`,
-      confirmText: '确认分发'
+      disableAutoTranslate: true,
+      title: isEnglish ? 'Distribute to Class' : '分发给班级',
+      message: isEnglish ? `Distribute "${project.name}" to all students in "${selectedClass.name}"?` : `确定将「${project.name}」分发给「${selectedClass.name}」的所有学生吗？`,
+      highlight: isEnglish ? `Students will see this in Root Group after refreshing: from ${currentUser?.username || 'Teacher'} - ${project.name}` : `学生刷新后会在根作品组看到：来自${currentUser?.username || '老师'} - ${project.name}`,
+      confirmText: isEnglish ? 'Confirm Distribution' : '确认分发'
     });
     if (!confirmed) return;
 
@@ -550,12 +558,14 @@ const Dashboard = () => {
       setLoading(true);
       const result = await distributeProjectToClass(project.id, selectedClass.id);
       await appDialog.alert({
-        title: '分发完成',
-        message: result.message || '项目已分发给班级学生。'
+        disableAutoTranslate: true,
+        title: isEnglish ? 'Distribution Complete' : '分发完成',
+        message: isEnglish ? 'The project has been distributed to the class students.' : (result.message || '项目已分发给班级学生。')
       });
     } catch (err) {
       await appDialog.alert({
-        title: '分发失败',
+        disableAutoTranslate: true,
+        title: isEnglish ? 'Distribution Failed' : '分发失败',
         message: err.message
       });
     } finally {
@@ -566,9 +576,10 @@ const Dashboard = () => {
   // 6. 退出登录逻辑
   const handleLogout = async () => {
     if (await appDialog.confirm({
-      title: '离开基地',
-      message: '🚪 确定要离开我们的编程乐园基地吗？今天学得很棒，下次再见哦！',
-      confirmText: '离开基地'
+      disableAutoTranslate: true,
+      title: isEnglish ? 'Log Out' : '离开基地',
+      message: isEnglish ? '🚪 Are you sure you want to leave our coding playground? Great work today. See you next time!' : '🚪 确定要离开我们的编程乐园基地吗？今天学得很棒，下次再见哦！',
+      confirmText: isEnglish ? 'Log Out' : '离开基地'
     })) {
       localStorage.removeItem('teaching_token');
       localStorage.removeItem('teaching_user');
@@ -617,7 +628,7 @@ const Dashboard = () => {
                 {allProjectGroups
                   .filter((group) => moveDialog.type !== 'group' || Number(group.id) !== Number(moveDialog.item.id))
                   .map((group) => (
-                    <option key={group.id} value={group.id}>{buildGroupPath(group)}</option>
+                    <option data-i18n-skip key={group.id} value={group.id}>{buildGroupPath(group)}</option>
                   ))}
               </select>
             </label>
@@ -657,6 +668,8 @@ const Dashboard = () => {
         </div>
 
         <div className="flex items-center space-x-6">
+          <LanguageSelect />
+
           {/* 显示当前登录用户名 - 多角色微章样式 */}
           <button
             type="button"
@@ -668,7 +681,7 @@ const Dashboard = () => {
               <User className="w-4 h-4 text-indigo-600" />
             </div>
             <span className="text-xs font-black text-indigo-950">
-              {currentUser ? currentUser.username : '加载中...'}
+              {currentUser ? <span data-i18n-skip>{currentUser.username}</span> : '加载中...'}
             </span>
             <span className="text-[10px] bg-yellow-400 text-amber-950 px-2.5 py-0.5 rounded-full font-black tracking-wider shadow-sm">
               {/* 角色判断 */}
@@ -723,7 +736,7 @@ const Dashboard = () => {
                     <option value="">暂无班级</option>
                   ) : (
                     teacherClasses.map((classItem) => (
-                      <option key={classItem.id} value={classItem.class_code}>{classItem.name}</option>
+                      <option data-i18n-skip key={classItem.id} value={classItem.class_code}>{classItem.name}</option>
                     ))
                   )}
                 </select>
@@ -734,7 +747,7 @@ const Dashboard = () => {
               <p className="text-xs font-bold text-slate-400">你还没有绑定任何班级，请联系管理员。</p>
             ) : (
               <div className="space-y-3">
-                <p className="text-xs font-bold text-slate-400">当前班级：{findSelectedClass()?.name || '未选择班级'}</p>
+                <p className="text-xs font-bold text-slate-400">当前班级：{findSelectedClass()?.name ? <span data-i18n-skip>{findSelectedClass()?.name}</span> : '未选择班级'}</p>
                 <div className="flex flex-wrap gap-2.5">
                   {/* “我”的选项卡 */}
                   <button
@@ -759,7 +772,7 @@ const Dashboard = () => {
                           : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
                     }`}
                     >
-                      👤 {student.username}
+                      👤 <span data-i18n-skip>{student.username}</span>
                     </button>
                   ))}
                 </div>
@@ -776,7 +789,7 @@ const Dashboard = () => {
           <div>
             <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
               <span>
-                {selectedStudentId === 'me' ? '🎨 我的创意工坊' : `📂 正在督导 [${findSelectedStudent()?.username || '学生'}] 的作品`}
+                {selectedStudentId === 'me' ? '🎨 我的创意工坊' : <>📂 正在督导 [<span data-i18n-skip>{findSelectedStudent()?.username || (isEnglish ? 'Student' : '学生')}</span>] 的作品</>}
               </span>
               <Sparkles className="w-6 h-6 text-yellow-400 animate-pulse" />
             </h1>
@@ -832,7 +845,7 @@ const Dashboard = () => {
                     : 'bg-white/80 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'
                 }`}
               >
-                {group.name}
+                <span data-i18n-skip>{group.name}</span>
               </button>
             </React.Fragment>
           ))}
@@ -880,7 +893,7 @@ const Dashboard = () => {
                 <div>
                   <div className="space-y-2">
                     <h3 className="font-black text-base text-indigo-700 truncate pr-10">
-                      📁 {group.name}
+                      📁 <span data-i18n-skip>{group.name}</span>
                     </h3>
 
                     {selectedStudentId === 'me' && (
@@ -953,7 +966,7 @@ const Dashboard = () => {
                   <div>
                     <div className="space-y-2">
                       <h3 className={`font-black text-base text-slate-800 ${style.text} truncate pr-10`}>
-                        ✨ {project.name}
+                        ✨ <span data-i18n-skip>{project.name}</span>
                       </h3>
                       
                       {selectedStudentId !== 'me' && (

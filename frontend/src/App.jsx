@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import EditorView from './pages/EditorView';
 import Admin from './pages/Admin';
+import { LanguageProvider } from './i18n/LanguageContext';
 
 /**
  * 路由守卫组件：检查 localStorage 中是否存在登录 Token
@@ -17,6 +18,7 @@ const PrivateRoute = ({ children }) => {
 
 function App() {
   return (
+    <LanguageProvider>
     <Router basename="/teaching-p5js">
       <Routes>
         {/* 1. 默认访问根路径时，重定向到仪表盘（如果是未登录，会被 PrivateRoute 再次拦截到登录页） */}
@@ -55,6 +57,7 @@ function App() {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>
+    </LanguageProvider>
   );
 }
 
