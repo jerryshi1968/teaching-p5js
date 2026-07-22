@@ -21,6 +21,20 @@
 - AI code assistant: authenticated users can spend Tokens to request Gemini-compatible p5.js code suggestions, optionally with up to 3 reference images.
 - Local file storage: project metadata is stored in MySQL, while real project files live under `backend/storage/projects/<project-id>/`.
 
+## Screenshots
+
+### Dashboard
+
+![Dashboard screenshot](./docs/images/dashboard-en.jpg)
+
+### Online Editor
+
+![Online editor screenshot](./docs/images/editor-en.jpg)
+
+### Admin Dashboard
+
+![Admin dashboard screenshot](./docs/images/admin-en.jpg)
+
 ## Tech Stack
 
 ### Frontend
@@ -101,6 +115,11 @@ teaching-p5js/
 │       ├── i18n/
 │       ├── pages/
 │       └── services/
+├── docs/
+│   └── images/
+│       ├── admin-en.jpg
+│       ├── dashboard-en.jpg
+│       └── editor-en.jpg
 ├── setup_project.sh
 ├── README-en.md
 └── README.md

@@ -21,6 +21,20 @@ English version: [README-en.md](./README-en.md)
 - AI 代码助手：已登录用户可消耗 Token 调用 Gemini 兼容接口生成 p5.js 代码修改建议，支持最多 3 张图片作为参考。
 - 本地物理文件存储：项目文件元数据写入 MySQL，真实文件保存在 `backend/storage/projects/<project-id>/`。
 
+## 界面预览
+
+### 作品工作台
+
+![作品工作台截图](./docs/images/dashboard.jpg)
+
+### 在线编辑器
+
+![在线编辑器截图](./docs/images/editor.jpg)
+
+### 管理后台
+
+![管理后台截图](./docs/images/admin.jpg)
+
 ## 技术栈
 
 ### 前端
@@ -101,6 +115,11 @@ teaching-p5js/
 │       ├── i18n/
 │       ├── pages/
 │       └── services/
+├── docs/
+│   └── images/
+│       ├── admin.jpg
+│       ├── dashboard.jpg
+│       └── editor.jpg
 ├── setup_project.sh
 ├── README-en.md
 └── README.md
