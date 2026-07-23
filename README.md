@@ -6,6 +6,13 @@ English version: [README-en.md](./README-en.md)
 
 `teaching-p5js` 是一个面向 p5.js 创意编程教学的在线练习平台。学生可以注册登录、创建和管理作品、在线编辑 `index.html` / `sketch.js` / `style.css` 等项目文件，并在浏览器中实时运行预览；教师可以查看自己班级下的学生作品、复制优秀作品、向班级分发模板项目；管理员可以管理用户、班级、作品和 AI Token。
 
+- 给老师：可以查看学生作品、分发模板、管理班级。
+- 给学生：打开浏览器就能写 p5.js，不用配置环境。
+- 给机构/学校：可私有部署，数据自己掌握。
+- 给创意编程社区：比单机编辑器更适合教学组织。
+- 给开发者：React + Express + MySQL，结构清楚，方便二次开发。
+演示网站链接：[https://tigao123.com/teaching-p5js](https://tigao123.com/teaching-p5js)
+
 ## 功能概览
 
 - 用户注册与登录：基于 JWT 的接口认证，支持个人资料、手机号、性别、生日、班级码和密码维护。
@@ -29,15 +36,27 @@ English version: [README-en.md](./README-en.md)
 
 ### 作品工作台
 
-作品工作台截图
+```markdown
+![Dashboard screenshot](./docs/images/dashboard.jpg)
+```
+
+
 
 ### 在线编辑器
 
-在线编辑器截图
+```markdown
+![Online editor screenshot](./docs/images/editor.jpg)
+```
+
+
 
 ### 管理后台
 
-管理后台截图
+```markdown
+![Admin dashboard screenshot](./docs/images/admin.jpg)
+```
+
+
 
 ## 技术栈
 

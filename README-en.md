@@ -6,6 +6,13 @@
 
 `teaching-p5js` is an online practice platform for teaching creative coding with p5.js. Students can register, sign in, create and organize projects, edit files such as `index.html`, `sketch.js`, and `style.css`, and preview their work in the browser. Teachers can review projects from students in their classes, copy good examples, and distribute template projects to a class. Administrators can manage users, classes, projects, and AI Token balances.
 
+- For teachers: You can view student works, distribute templates, and manage classes.
+- For students: You can start writing p5.js by simply opening a browser, without the need to configure the environment.
+- For institutions/schools: It can be privately deployed, with data controlled by themselves.
+- For the creative coding community: It is more suitable for teaching organizations than standalone editors.
+- For developers: React + Express + MySQL, with a clear structure, facilitating secondary development.
+Demo website link: [https://tigao123.com/teaching-p5js](https://tigao123.com/teaching-p5js)
+
 ## Features
 
 - User registration and login: JWT-based API authentication, with profile, phone number, gender, birthday, class code, and password management.
