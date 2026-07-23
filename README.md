@@ -28,39 +28,21 @@ English version: [README-en.md](./README-en.md)
 - AI 代码助手：已登录用户可消耗 Token 调用 Gemini 兼容接口生成 p5.js 代码修改建议，支持最多 3 张图片作为参考。
 - 本地物理文件存储：项目文件元数据写入 MySQL，真实文件保存在 `backend/storage/projects/<project-id>/`。
 
-
-
 ## 界面预览
-
-
 
 ### 作品工作台
 
-```markdown
 ![Dashboard screenshot](./docs/images/dashboard.jpg)
-```
-
-
 
 ### 在线编辑器
 
-```markdown
 ![Online editor screenshot](./docs/images/editor.jpg)
-```
-
-
 
 ### 管理后台
 
-```markdown
 ![Admin dashboard screenshot](./docs/images/admin.jpg)
-```
-
-
 
 ## 技术栈
-
-
 
 ### 前端
 
@@ -71,8 +53,6 @@ English version: [README-en.md](./README-en.md)
 - CodeMirror 6
 - lucide-react
 - react-split
-
-
 
 ### 后端
 
@@ -85,8 +65,6 @@ English version: [README-en.md](./README-en.md)
 - dotenv
 - 阿里云短信服务
 - Gemini 兼容 AI 接口
-
-
 
 ## 项目结构
 
@@ -154,8 +132,6 @@ teaching-p5js/
 └── README.md
 ```
 
-
-
 ## 环境要求
 
 - Node.js 18 或更高版本
@@ -164,11 +140,7 @@ teaching-p5js/
 - 可选：阿里云短信服务配置
 - 可选：Gemini 兼容接口密钥
 
-
-
 ## 快速开始
-
-
 
 ### 1. 安装依赖
 
@@ -185,8 +157,6 @@ npm install
 cd ../frontend
 npm install
 ```
-
-
 
 ### 2. 配置后端环境变量
 
@@ -223,8 +193,6 @@ ALIYUN_SMS_TEMPLATE_CODE_PLACEHOLDER=##code##
 ALIYUN_SMS_TEMPLATE_MINUTE_PARAM_NAME=min
 ALIYUN_SMS_TEMPLATE_MINUTE_VALUE=5
 ```
-
-
 
 ### 3. 初始化数据库
 
@@ -366,8 +334,6 @@ UPDATE users SET role = 'admin' WHERE username = 'admin_username';
 UPDATE users SET role = 'teacher' WHERE username = 'teacher_username';
 ```
 
-
-
 ### 4. 启动后端
 
 ```bash
@@ -386,8 +352,6 @@ http://localhost:5000
 ```text
 GET /api/health
 ```
-
-
 
 ### 5. 启动前端
 
@@ -412,8 +376,6 @@ server: {
 }
 ```
 
-
-
 ## 常用脚本
 
 后端：
@@ -431,8 +393,6 @@ npm run build
 npm run preview
 ```
 
-
-
 ## API 概览
 
 除注册、登录、验证码、短信验证码和健康检查外，业务接口都需要在请求头中携带：
@@ -441,10 +401,7 @@ npm run preview
 Authorization: Bearer <token>
 ```
 
-
-
 ### 认证与个人信息
-
 
 | 方法     | 路径                                      | 说明                  |
 | ------ | --------------------------------------- | ------------------- |
@@ -461,11 +418,7 @@ Authorization: Bearer <token>
 | `GET`  | `/api/auth/my-classes`                  | 教师/管理员获取自己管理的班级     |
 | `GET`  | `/api/auth/classes/:classCode/students` | 教师/管理员获取指定班级学生      |
 
-
-
-
 ### 项目
-
 
 | 方法       | 路径                                      | 说明                          |
 | -------- | --------------------------------------- | --------------------------- |
@@ -481,11 +434,7 @@ Authorization: Bearer <token>
 | `PUT`    | `/api/projects/:id/move`                | 移动项目到其他作品组                  |
 | `DELETE` | `/api/projects/:id`                     | 删除项目及物理文件                   |
 
-
-
-
 ### 作品组
-
 
 | 方法       | 路径                             | 说明                                        |
 | -------- | ------------------------------ | ----------------------------------------- |
@@ -497,11 +446,7 @@ Authorization: Bearer <token>
 | `PUT`    | `/api/project-groups/:id/move` | 移动作品组                                     |
 | `DELETE` | `/api/project-groups/:id`      | 删除空作品组                                    |
 
-
-
-
 ### 文件
-
 
 | 方法       | 路径                                     | 说明                  |
 | -------- | -------------------------------------- | ------------------- |
@@ -512,21 +457,13 @@ Authorization: Bearer <token>
 | `PUT`    | `/api/files/:id`                       | 保存文本文件内容            |
 | `DELETE` | `/api/files/:id`                       | 删除文件或文件夹            |
 
-
-
-
 ### AI
-
 
 | 方法     | 路径                                | 说明                           |
 | ------ | --------------------------------- | ---------------------------- |
 | `POST` | `/api/ai/project/:projectId/code` | 调用 AI 生成代码修改建议，并按使用量扣减 Token |
 
-
-
-
 ### 管理后台
-
 
 | 方法       | 路径                                           | 说明             |
 | -------- | -------------------------------------------- | -------------- |
@@ -543,9 +480,6 @@ Authorization: Bearer <token>
 | `DELETE` | `/api/admin/classes/:id/students/:studentId` | 将学生移出班级        |
 | `PUT`    | `/api/admin/classes/:id`                     | 修改班级           |
 | `DELETE` | `/api/admin/classes/:id`                     | 删除班级并清空学生班级码   |
-
-
-
 
 ## 项目文件模板
 
@@ -573,8 +507,6 @@ backend/storage/projects/<project-id>/
 <script src="/teaching-p5js/libs/p5-1.11.13.min.js"></script>
 ```
 
-
-
 ## 数据模型关系
 
 - `users` 是核心用户表，使用 `role` 区分 `student`、`teacher`、`admin`，并用 `tokens` 记录 AI 可用余额。
@@ -586,12 +518,9 @@ backend/storage/projects/<project-id>/
 - `sms_send_logs` 记录手机号/IP 的短信发送日志，用于频率限制。
 - `token_transactions` 记录管理员充值和 AI 消耗流水，便于追踪余额变动。
 
-
-
 ## 前端路由
 
 项目使用 `BrowserRouter`，基础路径为 `/teaching-p5js`：
-
 
 | 路径                                 | 说明          |
 | ---------------------------------- | ----------- |
@@ -600,15 +529,12 @@ backend/storage/projects/<project-id>/
 | `/teaching-p5js/editor/:projectId` | 在线编辑器与预览页   |
 | `/teaching-p5js/admin`             | 管理后台，仅管理员可用 |
 
-
 登录状态保存在 `localStorage`：
 
 - `teaching_token`
 - `teaching_user`
 - `teaching_language`
 - `teaching_editor_code_font_size`
-
-
 
 ## 构建与部署
 
@@ -644,8 +570,6 @@ npm start
 - 生产环境启用短信服务前，确认阿里云短信模板和签名已经通过审核。
 - 使用 AI 功能前，确认 `GEMINI_API_KEY`、`GEMINI_BASE_URL`、`GEMINI_MODEL` 与 Token 充值流程已配置。
 
-
-
 ## 已知说明
 
 - 当前项目没有内置数据库迁移工具，首次部署需要手动建库建表。
@@ -653,8 +577,6 @@ npm start
 - `index.html` 不允许在文件管理中删除或重命名，以保证项目预览入口稳定。
 - 教师查看学生项目时默认只读；复制后会生成归属于教师自己的新项目。
 - AI 代码助手只允许修改 `index.html`、`style.css`、`sketch.js`，并要求返回 JSON 格式的建议。
-
-
 
 ## License
 
