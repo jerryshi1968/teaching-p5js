@@ -6,6 +6,7 @@ import { css } from '@codemirror/lang-css';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { EditorView } from '@codemirror/view';
 import { Check, Copy, HelpCircle, Palette, X } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const FONT_SIZE_MAP = {
   small: 14,
@@ -14,6 +15,7 @@ const FONT_SIZE_MAP = {
 };
 
 const CodeEditor = ({ value, onChange, fileName, readOnly = false, fontSize = 'medium', onFontSizeChange }) => {
+  const { language } = useLanguage();
   const editorViewRef = useRef(null);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState('#ffcc00');
@@ -84,7 +86,7 @@ const CodeEditor = ({ value, onChange, fileName, readOnly = false, fontSize = 'm
   };
 
   const handleOpenHelp = () => {
-    window.open('/teaching-p5js/help/', '_blank', 'noopener,noreferrer');
+    window.open(`/teaching-p5js/help/?lang=${language}`, '_blank', 'noopener,noreferrer');
   };
 
   return (

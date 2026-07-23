@@ -21,21 +21,27 @@ English version: [README-en.md](./README-en.md)
 - AI 代码助手：已登录用户可消耗 Token 调用 Gemini 兼容接口生成 p5.js 代码修改建议，支持最多 3 张图片作为参考。
 - 本地物理文件存储：项目文件元数据写入 MySQL，真实文件保存在 `backend/storage/projects/<project-id>/`。
 
+
+
 ## 界面预览
+
+
 
 ### 作品工作台
 
-![作品工作台截图](./docs/images/dashboard.jpg)
+作品工作台截图
 
 ### 在线编辑器
 
-![在线编辑器截图](./docs/images/editor.jpg)
+在线编辑器截图
 
 ### 管理后台
 
-![管理后台截图](./docs/images/admin.jpg)
+管理后台截图
 
 ## 技术栈
+
+
 
 ### 前端
 
@@ -46,6 +52,8 @@ English version: [README-en.md](./README-en.md)
 - CodeMirror 6
 - lucide-react
 - react-split
+
+
 
 ### 后端
 
@@ -58,6 +66,8 @@ English version: [README-en.md](./README-en.md)
 - dotenv
 - 阿里云短信服务
 - Gemini 兼容 AI 接口
+
+
 
 ## 项目结构
 
@@ -125,6 +135,8 @@ teaching-p5js/
 └── README.md
 ```
 
+
+
 ## 环境要求
 
 - Node.js 18 或更高版本
@@ -133,7 +145,11 @@ teaching-p5js/
 - 可选：阿里云短信服务配置
 - 可选：Gemini 兼容接口密钥
 
+
+
 ## 快速开始
+
+
 
 ### 1. 安装依赖
 
@@ -150,6 +166,8 @@ npm install
 cd ../frontend
 npm install
 ```
+
+
 
 ### 2. 配置后端环境变量
 
@@ -169,7 +187,7 @@ DB_NAME=teaching_p5js
 JWT_SECRET=replace_with_a_strong_secret
 
 GEMINI_API_KEY=your_gemini_api_key
-GEMINI_BASE_URL=https://relay.tigao123.top
+GEMINI_BASE_URL=https://relay_server_url
 GEMINI_MODEL=gemini-3.5-flash
 GEMINI_MAX_OUTPUT_TOKENS=24576
 
@@ -186,6 +204,8 @@ ALIYUN_SMS_TEMPLATE_CODE_PLACEHOLDER=##code##
 ALIYUN_SMS_TEMPLATE_MINUTE_PARAM_NAME=min
 ALIYUN_SMS_TEMPLATE_MINUTE_VALUE=5
 ```
+
+
 
 ### 3. 初始化数据库
 
@@ -327,6 +347,8 @@ UPDATE users SET role = 'admin' WHERE username = 'admin_username';
 UPDATE users SET role = 'teacher' WHERE username = 'teacher_username';
 ```
 
+
+
 ### 4. 启动后端
 
 ```bash
@@ -345,6 +367,8 @@ http://localhost:5000
 ```text
 GET /api/health
 ```
+
+
 
 ### 5. 启动前端
 
@@ -369,6 +393,8 @@ server: {
 }
 ```
 
+
+
 ## 常用脚本
 
 后端：
@@ -386,6 +412,8 @@ npm run build
 npm run preview
 ```
 
+
+
 ## API 概览
 
 除注册、登录、验证码、短信验证码和健康检查外，业务接口都需要在请求头中携带：
@@ -394,85 +422,111 @@ npm run preview
 Authorization: Bearer <token>
 ```
 
+
+
 ### 认证与个人信息
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| `POST` | `/api/auth/captcha/challenge` | 创建滑块验证码挑战 |
-| `POST` | `/api/auth/captcha/verify` | 校验滑块位置并返回短信前置 token |
-| `POST` | `/api/auth/sms-code` | 发送注册短信验证码 |
-| `POST` | `/api/auth/register` | 注册学生账号 |
-| `POST` | `/api/auth/login` | 登录并获取 JWT |
-| `GET` | `/api/auth/me` | 获取当前用户资料 |
-| `POST` | `/api/auth/me/sms-code` | 修改手机号前发送短信验证码 |
-| `PUT` | `/api/auth/me` | 更新个人资料 |
-| `PUT` | `/api/auth/me/password` | 修改密码 |
-| `GET` | `/api/auth/students` | 教师/管理员获取可见学生列表 |
-| `GET` | `/api/auth/my-classes` | 教师/管理员获取自己管理的班级 |
-| `GET` | `/api/auth/classes/:classCode/students` | 教师/管理员获取指定班级学生 |
+
+| 方法     | 路径                                      | 说明                  |
+| ------ | --------------------------------------- | ------------------- |
+| `POST` | `/api/auth/captcha/challenge`           | 创建滑块验证码挑战           |
+| `POST` | `/api/auth/captcha/verify`              | 校验滑块位置并返回短信前置 token |
+| `POST` | `/api/auth/sms-code`                    | 发送注册短信验证码           |
+| `POST` | `/api/auth/register`                    | 注册学生账号              |
+| `POST` | `/api/auth/login`                       | 登录并获取 JWT           |
+| `GET`  | `/api/auth/me`                          | 获取当前用户资料            |
+| `POST` | `/api/auth/me/sms-code`                 | 修改手机号前发送短信验证码       |
+| `PUT`  | `/api/auth/me`                          | 更新个人资料              |
+| `PUT`  | `/api/auth/me/password`                 | 修改密码                |
+| `GET`  | `/api/auth/students`                    | 教师/管理员获取可见学生列表      |
+| `GET`  | `/api/auth/my-classes`                  | 教师/管理员获取自己管理的班级     |
+| `GET`  | `/api/auth/classes/:classCode/students` | 教师/管理员获取指定班级学生      |
+
+
+
 
 ### 项目
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| `GET` | `/api/projects` | 获取当前用户项目列表，可用 `parentId` 过滤 |
-| `GET` | `/api/projects?studentId=<id>` | 教师/管理员查看可见学生项目 |
-| `POST` | `/api/projects` | 创建项目并生成默认文件 |
-| `POST` | `/api/projects/copy` | 复制可访问项目到当前用户 |
-| `POST` | `/api/projects/:id/copy` | 复制指定项目到当前用户 |
-| `POST` | `/api/projects/:id/distribute-to-class` | 教师将项目分发给班级学生 |
-| `PUT` | `/api/projects/reorder` | 调整当前目录下项目排序 |
-| `GET` | `/api/projects/:id` | 获取单个项目信息和编辑权限 |
-| `PUT` | `/api/projects/:id` | 修改项目名称 |
-| `PUT` | `/api/projects/:id/move` | 移动项目到其他作品组 |
-| `DELETE` | `/api/projects/:id` | 删除项目及物理文件 |
+
+| 方法       | 路径                                      | 说明                          |
+| -------- | --------------------------------------- | --------------------------- |
+| `GET`    | `/api/projects`                         | 获取当前用户项目列表，可用 `parentId` 过滤 |
+| `GET`    | `/api/projects?studentId=<id>`          | 教师/管理员查看可见学生项目              |
+| `POST`   | `/api/projects`                         | 创建项目并生成默认文件                 |
+| `POST`   | `/api/projects/copy`                    | 复制可访问项目到当前用户                |
+| `POST`   | `/api/projects/:id/copy`                | 复制指定项目到当前用户                 |
+| `POST`   | `/api/projects/:id/distribute-to-class` | 教师将项目分发给班级学生                |
+| `PUT`    | `/api/projects/reorder`                 | 调整当前目录下项目排序                 |
+| `GET`    | `/api/projects/:id`                     | 获取单个项目信息和编辑权限               |
+| `PUT`    | `/api/projects/:id`                     | 修改项目名称                      |
+| `PUT`    | `/api/projects/:id/move`                | 移动项目到其他作品组                  |
+| `DELETE` | `/api/projects/:id`                     | 删除项目及物理文件                   |
+
+
+
 
 ### 作品组
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| `GET` | `/api/project-groups` | 获取当前目录作品组和面包屑，可用 `parentId` / `studentId` |
-| `GET` | `/api/project-groups/all` | 获取当前用户全部作品组 |
-| `POST` | `/api/project-groups` | 创建作品组 |
-| `PUT` | `/api/project-groups/reorder` | 调整作品组排序 |
-| `PUT` | `/api/project-groups/:id` | 修改作品组名称 |
-| `PUT` | `/api/project-groups/:id/move` | 移动作品组 |
-| `DELETE` | `/api/project-groups/:id` | 删除空作品组 |
+
+| 方法       | 路径                             | 说明                                        |
+| -------- | ------------------------------ | ----------------------------------------- |
+| `GET`    | `/api/project-groups`          | 获取当前目录作品组和面包屑，可用 `parentId` / `studentId` |
+| `GET`    | `/api/project-groups/all`      | 获取当前用户全部作品组                               |
+| `POST`   | `/api/project-groups`          | 创建作品组                                     |
+| `PUT`    | `/api/project-groups/reorder`  | 调整作品组排序                                   |
+| `PUT`    | `/api/project-groups/:id`      | 修改作品组名称                                   |
+| `PUT`    | `/api/project-groups/:id/move` | 移动作品组                                     |
+| `DELETE` | `/api/project-groups/:id`      | 删除空作品组                                    |
+
+
+
 
 ### 文件
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| `GET` | `/api/files/project/:projectId` | 获取项目文件树、文本内容和资源 URL |
-| `POST` | `/api/files/project/:projectId` | 创建文本文件或文件夹 |
-| `POST` | `/api/files/project/:projectId/upload` | 上传资源文件 |
-| `PATCH` | `/api/files/:id/rename` | 重命名文件或文件夹 |
-| `PUT` | `/api/files/:id` | 保存文本文件内容 |
-| `DELETE` | `/api/files/:id` | 删除文件或文件夹 |
+
+| 方法       | 路径                                     | 说明                  |
+| -------- | -------------------------------------- | ------------------- |
+| `GET`    | `/api/files/project/:projectId`        | 获取项目文件树、文本内容和资源 URL |
+| `POST`   | `/api/files/project/:projectId`        | 创建文本文件或文件夹          |
+| `POST`   | `/api/files/project/:projectId/upload` | 上传资源文件              |
+| `PATCH`  | `/api/files/:id/rename`                | 重命名文件或文件夹           |
+| `PUT`    | `/api/files/:id`                       | 保存文本文件内容            |
+| `DELETE` | `/api/files/:id`                       | 删除文件或文件夹            |
+
+
+
 
 ### AI
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
+
+| 方法     | 路径                                | 说明                           |
+| ------ | --------------------------------- | ---------------------------- |
 | `POST` | `/api/ai/project/:projectId/code` | 调用 AI 生成代码修改建议，并按使用量扣减 Token |
+
+
+
 
 ### 管理后台
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| `GET` | `/api/admin/users` | 分页查询用户 |
-| `PUT` | `/api/admin/users/:id/role` | 修改用户角色，支持学生/教师 |
-| `POST` | `/api/admin/users/:id/tokens/recharge` | 给用户充值 AI Token |
-| `PATCH` | `/api/admin/users/:id/tokens/recharge` | 给用户充值 AI Token |
-| `GET` | `/api/admin/token-transactions` | 分页查询 Token 流水 |
-| `GET` | `/api/admin/projects` | 分页查询全站作品 |
-| `GET` | `/api/admin/teachers` | 获取教师列表 |
-| `GET` | `/api/admin/classes` | 分页查询班级 |
-| `POST` | `/api/admin/classes` | 创建班级 |
-| `GET` | `/api/admin/classes/:id/students` | 查看班级学生 |
-| `DELETE` | `/api/admin/classes/:id/students/:studentId` | 将学生移出班级 |
-| `PUT` | `/api/admin/classes/:id` | 修改班级 |
-| `DELETE` | `/api/admin/classes/:id` | 删除班级并清空学生班级码 |
+
+| 方法       | 路径                                           | 说明             |
+| -------- | -------------------------------------------- | -------------- |
+| `GET`    | `/api/admin/users`                           | 分页查询用户         |
+| `PUT`    | `/api/admin/users/:id/role`                  | 修改用户角色，支持学生/教师 |
+| `POST`   | `/api/admin/users/:id/tokens/recharge`       | 给用户充值 AI Token |
+| `PATCH`  | `/api/admin/users/:id/tokens/recharge`       | 给用户充值 AI Token |
+| `GET`    | `/api/admin/token-transactions`              | 分页查询 Token 流水  |
+| `GET`    | `/api/admin/projects`                        | 分页查询全站作品       |
+| `GET`    | `/api/admin/teachers`                        | 获取教师列表         |
+| `GET`    | `/api/admin/classes`                         | 分页查询班级         |
+| `POST`   | `/api/admin/classes`                         | 创建班级           |
+| `GET`    | `/api/admin/classes/:id/students`            | 查看班级学生         |
+| `DELETE` | `/api/admin/classes/:id/students/:studentId` | 将学生移出班级        |
+| `PUT`    | `/api/admin/classes/:id`                     | 修改班级           |
+| `DELETE` | `/api/admin/classes/:id`                     | 删除班级并清空学生班级码   |
+
+
+
 
 ## 项目文件模板
 
@@ -500,6 +554,8 @@ backend/storage/projects/<project-id>/
 <script src="/teaching-p5js/libs/p5-1.11.13.min.js"></script>
 ```
 
+
+
 ## 数据模型关系
 
 - `users` 是核心用户表，使用 `role` 区分 `student`、`teacher`、`admin`，并用 `tokens` 记录 AI 可用余额。
@@ -511,16 +567,20 @@ backend/storage/projects/<project-id>/
 - `sms_send_logs` 记录手机号/IP 的短信发送日志，用于频率限制。
 - `token_transactions` 记录管理员充值和 AI 消耗流水，便于追踪余额变动。
 
+
+
 ## 前端路由
 
 项目使用 `BrowserRouter`，基础路径为 `/teaching-p5js`：
 
-| 路径 | 说明 |
-| --- | --- |
-| `/teaching-p5js/login` | 登录与注册页面 |
-| `/teaching-p5js/dashboard` | 学生/教师作品工作台 |
-| `/teaching-p5js/editor/:projectId` | 在线编辑器与预览页 |
-| `/teaching-p5js/admin` | 管理后台，仅管理员可用 |
+
+| 路径                                 | 说明          |
+| ---------------------------------- | ----------- |
+| `/teaching-p5js/login`             | 登录与注册页面     |
+| `/teaching-p5js/dashboard`         | 学生/教师作品工作台  |
+| `/teaching-p5js/editor/:projectId` | 在线编辑器与预览页   |
+| `/teaching-p5js/admin`             | 管理后台，仅管理员可用 |
+
 
 登录状态保存在 `localStorage`：
 
@@ -528,6 +588,8 @@ backend/storage/projects/<project-id>/
 - `teaching_user`
 - `teaching_language`
 - `teaching_editor_code_font_size`
+
+
 
 ## 构建与部署
 
@@ -563,6 +625,8 @@ npm start
 - 生产环境启用短信服务前，确认阿里云短信模板和签名已经通过审核。
 - 使用 AI 功能前，确认 `GEMINI_API_KEY`、`GEMINI_BASE_URL`、`GEMINI_MODEL` 与 Token 充值流程已配置。
 
+
+
 ## 已知说明
 
 - 当前项目没有内置数据库迁移工具，首次部署需要手动建库建表。
@@ -570,6 +634,8 @@ npm start
 - `index.html` 不允许在文件管理中删除或重命名，以保证项目预览入口稳定。
 - 教师查看学生项目时默认只读；复制后会生成归属于教师自己的新项目。
 - AI 代码助手只允许修改 `index.html`、`style.css`、`sketch.js`，并要求返回 JSON 格式的建议。
+
+
 
 ## License
 
