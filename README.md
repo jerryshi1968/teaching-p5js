@@ -29,6 +29,7 @@ English version: [README-en.md](./README-en.md)
 - 本地物理文件存储：项目文件元数据写入 MySQL，真实文件保存在 `backend/storage/projects/<project-id>/`。
 
 ## 界面预览
+![teaching-p5js demo](./docs/images/p5js-intro.gif)
 
 ### 作品工作台
 
