@@ -86,7 +86,7 @@ const CodeEditor = ({ value, onChange, fileName, readOnly = false, fontSize = 'm
   };
 
   const handleOpenHelp = () => {
-    window.open(`/teaching-p5js/help/?lang=${language}`, '_blank', 'noopener,noreferrer');
+    window.open(`/teaching-p5js/help/?lang=${language}&t=${Date.now()}`, '_blank', 'noopener,noreferrer');
   };
 
   return (
