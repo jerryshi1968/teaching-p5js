@@ -5,6 +5,56 @@ const TokenTransaction = require('../models/tokenTransactionModel');
 
 const CLASS_CODE_PATTERN = /^[A-Za-z0-9]{4,10}$/;
 
+const escapeCsvCell = (value) => {
+  const text = value === null || value === undefined ? '' : String(value);
+  if (/[",\r\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+};
+
+const formatDateTime = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+};
+
+const formatGender = (gender) => {
+  if (gender === 'male') return '男';
+  if (gender === 'female') return '女';
+  return '未填写';
+};
+
+const formatRole = (role) => {
+  if (role === 'admin') return '管理员';
+  if (role === 'teacher') return '教师';
+  if (role === 'student') return '学生';
+  return role || '';
+};
+
+const formatUserClass = (user) => {
+  if (!user.class_code) return '未分班';
+  if (user.class_name) return user.class_name;
+  return `无效：${user.class_code}`;
+};
+
+const formatExportFileTimestamp = () => {
+  const date = new Date();
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}-${hh}${min}`;
+};
+
 const normalizeClassPayload = (body) => {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const classCode = typeof body.classCode === 'string' ? body.classCode.trim() : '';
@@ -55,6 +105,34 @@ exports.listUsers = async (req, res, next) => {
       total,
       totalPages: Math.ceil(total / pageSize)
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.exportUsers = async (req, res, next) => {
+  try {
+    const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
+    const users = await User.listUsersForExport({ username });
+    const headers = ['用户名', '手机号码', '班级', '性别', '生日', '角色', 'Token余额', '创建时间'];
+    const rows = users.map((user) => [
+      user.username || '',
+      user.phone || '',
+      formatUserClass(user),
+      formatGender(user.gender),
+      user.birthday || '',
+      formatRole(user.role),
+      Number(user.tokens || 0),
+      formatDateTime(user.created_at)
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map(escapeCsvCell).join(','))
+      .join('\r\n');
+    const filename = `users-${formatExportFileTimestamp()}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(`\uFEFF${csv}`);
   } catch (err) {
     next(err);
   }

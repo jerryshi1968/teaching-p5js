@@ -192,6 +192,37 @@ export const fetchAdminUsers = async (page = 1, pageSize = 10, username = '') =>
   return data;
 };
 
+export const exportAdminUsers = async (username = '') => {
+  const params = new URLSearchParams();
+  if (username.trim()) {
+    params.set('username', username.trim());
+  }
+
+  const response = await fetch(`/api/admin/users/export${params.toString() ? `?${params.toString()}` : ''}`, {
+    method: 'GET',
+    headers: {
+      ...getAuthHeader()
+    }
+  });
+  const contentType = response.headers.get('content-type') || '';
+  if (response.status === 401 || response.status === 403) {
+    const data = contentType.includes('application/json') ? await response.json() : null;
+    throw new Error(data?.message || '无权导出用户列表。');
+  }
+  if (!response.ok) {
+    const data = contentType.includes('application/json') ? await response.json() : null;
+    throw new Error(data?.message || `导出用户列表失败（HTTP ${response.status}），请重试。`);
+  }
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get('content-disposition') || '';
+  const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+  return {
+    blob,
+    filename: filenameMatch?.[1] || 'users.csv'
+  };
+};
+
 export const updateAdminUserRole = async (userId, role) => {
   const response = await fetch(`/api/admin/users/${userId}/role`, {
     method: 'PUT',

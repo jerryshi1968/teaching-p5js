@@ -5,6 +5,7 @@ const adminMiddleware = require('../middleware/adminMiddleware');
 const adminController = require('../controllers/adminController');
 
 router.get('/users', authMiddleware, adminMiddleware, adminController.listUsers);
+router.get('/users/export', authMiddleware, adminMiddleware, adminController.exportUsers);
 router.put('/users/:id/role', authMiddleware, adminMiddleware, adminController.updateUserRole);
 router.post('/users/:id/tokens/recharge', authMiddleware, adminMiddleware, adminController.rechargeUserTokens);
 router.patch('/users/:id/tokens/recharge', authMiddleware, adminMiddleware, adminController.rechargeUserTokens);

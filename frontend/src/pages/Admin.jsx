@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Edit2, ExternalLink, FileCode, History, Plus, Save, School, Trash2, Users, X } from 'lucide-react';
-import { createAdminClass, deleteAdminClass, fetchAdminClasses, fetchAdminClassStudents, fetchAdminProjects, fetchAdminTeachers, fetchAdminTokenTransactions, fetchAdminUsers, rechargeAdminUserTokens, removeAdminClassStudent, updateAdminClass, updateAdminUserRole } from '../services/api';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Edit2, ExternalLink, FileCode, History, Plus, Save, School, Trash2, Users, X } from 'lucide-react';
+import { createAdminClass, deleteAdminClass, exportAdminUsers, fetchAdminClasses, fetchAdminClassStudents, fetchAdminProjects, fetchAdminTeachers, fetchAdminTokenTransactions, fetchAdminUsers, rechargeAdminUserTokens, removeAdminClassStudent, updateAdminClass, updateAdminUserRole } from '../services/api';
 
 const PAGE_SIZE = 10;
 
@@ -16,6 +16,7 @@ const Admin = () => {
   const [error, setError] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [usernameKeyword, setUsernameKeyword] = useState('');
+  const [exportingUsers, setExportingUsers] = useState(false);
   const [roleUpdatingId, setRoleUpdatingId] = useState(null);
   const [tokenChargingId, setTokenChargingId] = useState(null);
   const [tokenTransactions, setTokenTransactions] = useState([]);
@@ -187,6 +188,26 @@ const Admin = () => {
     e.preventDefault();
     setPage(1);
     setUsernameKeyword(searchInput.trim());
+  };
+
+  const handleExportUsers = async () => {
+    try {
+      setError('');
+      setExportingUsers(true);
+      const { blob, filename } = await exportAdminUsers(usernameKeyword);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || '导出用户列表失败，请重试。');
+    } finally {
+      setExportingUsers(false);
+    }
   };
 
   const handleTokenTransactionSearch = (e) => {
@@ -507,6 +528,15 @@ const Admin = () => {
                 disabled={loading}
               >
                 查找
+              </button>
+              <button
+                type="button"
+                onClick={handleExportUsers}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+                disabled={loading || exportingUsers}
+              >
+                <Download className="w-4 h-4" />
+                <span>{exportingUsers ? '导出中...' : '导出'}</span>
               </button>
               {usernameKeyword && (
                 <button

@@ -110,6 +110,17 @@ exports.listUsersPaginated = async ({ limit, offset, username = '' }) => {
   return rows;
 };
 
+exports.listUsersForExport = async ({ username = '' } = {}) => {
+  const keyword = username.trim();
+  const whereClause = keyword ? ' WHERE u.username LIKE ?' : '';
+  const params = keyword ? [`%${keyword}%`] : [];
+  const [rows] = await db.query(
+    `SELECT u.id, u.username, u.phone, u.class_code, c.name AS class_name, u.gender, DATE_FORMAT(u.birthday, "%Y-%m-%d") AS birthday, u.role, u.tokens, u.created_at FROM users u LEFT JOIN classes c ON u.class_code = c.class_code${whereClause} ORDER BY u.created_at DESC, u.id DESC`,
+    params
+  );
+  return rows;
+};
+
 exports.countUsers = async ({ username = '' } = {}) => {
   const keyword = username.trim();
   const whereClause = keyword ? ' WHERE username LIKE ?' : '';
