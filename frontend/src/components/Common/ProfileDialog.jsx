@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarDays, Coins, Eye, EyeOff, KeyRound, Lock, Phone, Save, User, Users, X } from 'lucide-react';
 import SmsCodeField from './SmsCodeField';
+import { getLanguageHeader } from '../../services/api';
 
 const currentYear = new Date().getFullYear();
 const birthdayYears = Array.from({ length: 100 }, (_, index) => currentYear - index);
@@ -64,7 +65,7 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
       try {
         const token = localStorage.getItem('teaching_token');
         const response = await fetch('/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}`, ...getLanguageHeader() }
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || '个人信息加载失败。');
@@ -162,7 +163,8 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          ...getLanguageHeader()
         },
         body: JSON.stringify({
           oldPassword: passwordForm.oldPassword,
@@ -228,7 +230,8 @@ const ProfileDialog = ({ open, onClose, onSaved }) => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          ...getLanguageHeader()
         },
         body: JSON.stringify({
           username: form.username.trim(),

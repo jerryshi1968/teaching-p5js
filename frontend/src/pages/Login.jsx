@@ -4,6 +4,7 @@ import { User, Lock, Eye, EyeOff, KeyRound, AlertCircle, Smile, Sparkles, Star, 
 import { useAppDialog } from '../hooks/useAppDialog';
 import SmsCodeField from '../components/Common/SmsCodeField';
 import LanguageSelect from '../components/Common/LanguageSelect';
+import { getLanguageHeader } from '../services/api';
 
 const currentYear = new Date().getFullYear();
 const birthdayYears = Array.from({ length: 30 }, (_, index) => currentYear - index);
@@ -112,7 +113,8 @@ const Login = () => {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...getLanguageHeader()
         },
         body: JSON.stringify(requestBody)
       });

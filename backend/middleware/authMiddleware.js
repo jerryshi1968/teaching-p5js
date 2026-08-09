@@ -7,7 +7,7 @@ const authMiddleware = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1]; // 格式为 "Bearer <token>"
 
   if (!token) {
-    return res.status(401).json({ message: '访问拒绝：未提供认证 Token。' });
+    return res.status(401).json({ message: req.t('auth.tokenMissing') });
   }
 
   try {
@@ -23,7 +23,7 @@ const authMiddleware = (req, res, next) => {
     
     next(); // 继续执行后续逻辑
   } catch (err) {
-    return res.status(403).json({ message: '访问拒绝：无效或过期的 Token。' });
+    return res.status(403).json({ message: req.t('auth.tokenInvalid') });
   }
 };
 

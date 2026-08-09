@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
-import { getAuthHeader } from '../../services/api';
+import { getAuthHeader, getLanguageHeader } from '../../services/api';
 
 const SmsCodeField = ({ phone, purpose, value, onChange, sendEndpoint, authRequired = false, disabled = false }) => {
   const [countdown, setCountdown] = useState(0);
@@ -28,7 +28,7 @@ const SmsCodeField = ({ phone, purpose, value, onChange, sendEndpoint, authRequi
     try {
       const response = await fetch('/api/auth/captcha/challenge', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', ...getLanguageHeader() }
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || '滑块验证加载失败，请重试。');
@@ -50,6 +50,7 @@ const SmsCodeField = ({ phone, purpose, value, onChange, sendEndpoint, authRequi
     try {
       const headers = {
         'Content-Type': 'application/json',
+        ...getLanguageHeader(),
         ...(authRequired ? getAuthHeader() : {})
       };
       const response = await fetch(sendEndpoint, {
@@ -95,7 +96,7 @@ const SmsCodeField = ({ phone, purpose, value, onChange, sendEndpoint, authRequi
     try {
       const response = await fetch('/api/auth/captcha/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getLanguageHeader() },
         body: JSON.stringify({
           challengeId: challenge.challengeId,
           x: Number(sliderX)

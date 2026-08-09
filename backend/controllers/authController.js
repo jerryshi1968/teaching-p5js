@@ -98,12 +98,12 @@ exports.verifyCaptchaChallenge = async (req, res, next) => {
     const challenge = await Verification.findCaptchaChallenge(challengeId);
 
     if (!challenge || challenge.verified_at || challenge.used_at || new Date(challenge.expires_at).getTime() <= Date.now()) {
-      return res.status(400).json({ message: '滑块验证已失效，请重新验证。' });
+      return res.status(400).json({ message: req.t('auth.captchaExpired') });
     }
 
     const submittedX = Number(x);
     if (!Number.isFinite(submittedX) || Math.abs(submittedX - Number(challenge.target_x)) > 6) {
-      return res.status(400).json({ message: '滑块位置不正确，请再试一次。' });
+      return res.status(400).json({ message: req.t('auth.captchaPositionInvalid') });
     }
 
     const captchaToken = crypto.randomUUID();
@@ -114,7 +114,7 @@ exports.verifyCaptchaChallenge = async (req, res, next) => {
     });
 
     if (affectedRows === 0) {
-      return res.status(400).json({ message: '滑块验证已失效，请重新验证。' });
+      return res.status(400).json({ message: req.t('auth.captchaExpired') });
     }
 
     res.json({ captchaToken });
@@ -131,42 +131,42 @@ exports.sendSmsCode = async (req, res, next) => {
     const ipAddress = getRequestIp(req);
 
     if (!cleanPurpose) {
-      return res.status(400).json({ message: '短信验证码场景不正确。' });
+      return res.status(400).json({ message: req.t('auth.smsPurposeInvalid') });
     }
 
     if (cleanPurpose === 'update_phone' && !req.user) {
-      return res.status(401).json({ message: '请先登录后再修改手机号。' });
+      return res.status(401).json({ message: req.t('auth.loginRequiredForPhoneUpdate') });
     }
 
     if (!cleanPhone || !isValidPhone(cleanPhone)) {
-      return res.status(400).json({ message: '请输入正确的手机号码。' });
+      return res.status(400).json({ message: req.t('auth.phoneInvalid') });
     }
 
     if (!captchaToken) {
-      return res.status(400).json({ message: '请先完成滑块验证。' });
+      return res.status(400).json({ message: req.t('auth.captchaRequired') });
     }
 
     const captchaAffectedRows = await Verification.consumeCaptchaToken(hashValue(captchaToken));
     if (captchaAffectedRows === 0) {
-      return res.status(400).json({ message: '滑块验证已过期，请重新验证。' });
+      return res.status(400).json({ message: req.t('auth.captchaTokenExpired') });
     }
 
     const since = oneHourAgo();
     const phoneCount = await Verification.countSmsByPhone({ phone: cleanPhone, since });
     if (phoneCount >= SMS_PHONE_LIMIT_PER_HOUR) {
-      return res.status(429).json({ message: '该手机号验证码发送过于频繁，请 1 小时后再试。' });
+      return res.status(429).json({ message: req.t('auth.smsPhoneTooFrequent') });
     }
 
     const ipCount = await Verification.countSmsByIp({ ipAddress, since });
     if (ipCount >= SMS_IP_LIMIT_PER_HOUR) {
-      return res.status(429).json({ message: '当前网络验证码发送过于频繁，请稍后再试。' });
+      return res.status(429).json({ message: req.t('auth.smsIpTooFrequent') });
     }
 
     try {
       await smsService.sendVerificationCode({ phone: cleanPhone, sourceIp: ipAddress });
     } catch (smsErr) {
       console.error('SMS verification code send failed:', smsErr.message);
-      return res.status(502).json({ message: 'SMS send failed: ' + smsErr.message });
+      return res.status(502).json({ message: req.t('auth.smsSendFailed', { reason: smsErr.message }) });
     }
 
     await Verification.logSmsSend({
@@ -175,7 +175,7 @@ exports.sendSmsCode = async (req, res, next) => {
       purpose: cleanPurpose
     });
 
-    res.json({ message: '验证码已发送，请注意查收。' });
+    res.json({ message: req.t('auth.smsSent') });
   } catch (err) {
     next(err);
   }
@@ -186,30 +186,30 @@ exports.register = async (req, res, next) => {
     const { username, password, phone, classCode, gender, birthday, smsCode } = req.body;
 
     if (!username || !password || !phone) {
-      return res.status(400).json({ message: '用户名、密码和手机号不能为空。' });
+      return res.status(400).json({ message: req.t('auth.registerRequiredFields') });
     }
 
     const cleanPhone = phone.trim();
     const ipAddress = getRequestIp(req);
     if (!cleanPhone) {
-      return res.status(400).json({ message: '手机号不能为空。' });
+      return res.status(400).json({ message: req.t('auth.phoneRequired') });
     }
 
     if (!isValidPhone(cleanPhone)) {
-      return res.status(400).json({ message: '请输入正确的手机号码。' });
+      return res.status(400).json({ message: req.t('auth.phoneInvalid') });
     }
 
     if (gender && !['male', 'female'].includes(gender)) {
-      return res.status(400).json({ message: '性别选项不正确。' });
+      return res.status(400).json({ message: req.t('auth.genderInvalid') });
     }
 
     if (birthday && !isValidBirthday(birthday)) {
-      return res.status(400).json({ message: '生日格式不正确。' });
+      return res.status(400).json({ message: req.t('auth.birthdayInvalid') });
     }
 
     const userExists = await User.existsByUsername(username);
     if (userExists) {
-      return res.status(409).json({ message: '该用户名已被占用，请尝试其他登录名。' });
+      return res.status(409).json({ message: req.t('auth.usernameTaken') });
     }
 
     const smsCodeValid = await verifySmsCode({
@@ -219,7 +219,7 @@ exports.register = async (req, res, next) => {
     });
 
     if (!smsCodeValid) {
-      return res.status(400).json({ message: '手机验证码不正确或已过期。' });
+      return res.status(400).json({ message: req.t('auth.smsCodeInvalid') });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -234,7 +234,7 @@ exports.register = async (req, res, next) => {
       birthday: birthday || null
     });
 
-    res.status(201).json({ message: '注册成功！' });
+    res.status(201).json({ message: req.t('auth.registerSuccess') });
   } catch (err) {
     next(err);
   }
@@ -244,7 +244,7 @@ exports.getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(404).json({ message: '用户不存在。' });
+      return res.status(404).json({ message: req.t('auth.userNotFound') });
     }
 
     res.json(formatUserProfile(user));
@@ -258,7 +258,7 @@ exports.updateMe = async (req, res, next) => {
     const { username, phone, classCode, gender, birthday, smsCode } = req.body;
 
     if (!username || !phone) {
-      return res.status(400).json({ message: '用户名和手机号不能为空。' });
+      return res.status(400).json({ message: req.t('auth.profileRequiredFields') });
     }
 
     const cleanUsername = username.trim();
@@ -266,35 +266,35 @@ exports.updateMe = async (req, res, next) => {
     const ipAddress = getRequestIp(req);
 
     if (!cleanUsername) {
-      return res.status(400).json({ message: '用户名不能为空。' });
+      return res.status(400).json({ message: req.t('auth.usernameRequired') });
     }
 
     if (!cleanPhone) {
-      return res.status(400).json({ message: '手机号不能为空。' });
+      return res.status(400).json({ message: req.t('auth.phoneRequired') });
     }
 
     if (!isValidPhone(cleanPhone)) {
-      return res.status(400).json({ message: '请输入正确的手机号码。' });
+      return res.status(400).json({ message: req.t('auth.phoneInvalid') });
     }
 
     const currentUser = await User.findById(req.user.id);
     if (!currentUser) {
-      return res.status(404).json({ message: 'User not found.' });
+      return res.status(404).json({ message: req.t('auth.userNotFound') });
     }
 
     const phoneChanged = (currentUser.phone || '') !== cleanPhone;
 
     if (gender && !['male', 'female'].includes(gender)) {
-      return res.status(400).json({ message: '性别选项不正确。' });
+      return res.status(400).json({ message: req.t('auth.genderInvalid') });
     }
 
     if (birthday && !isValidBirthday(birthday)) {
-      return res.status(400).json({ message: '生日格式不正确。' });
+      return res.status(400).json({ message: req.t('auth.birthdayInvalid') });
     }
 
     const userExists = await User.existsByUsernameExceptId(cleanUsername, req.user.id);
     if (userExists) {
-      return res.status(409).json({ message: '该用户名已被占用，请尝试其他登录名。' });
+      return res.status(409).json({ message: req.t('auth.usernameTaken') });
     }
 
     if (phoneChanged) {
@@ -305,7 +305,7 @@ exports.updateMe = async (req, res, next) => {
       });
 
       if (!smsCodeValid) {
-        return res.status(400).json({ message: '手机验证码不正确或已过期。' });
+        return res.status(400).json({ message: req.t('auth.smsCodeInvalid') });
       }
     }
 
@@ -319,13 +319,13 @@ exports.updateMe = async (req, res, next) => {
     });
 
     if (affectedRows === 0) {
-      return res.status(404).json({ message: '用户不存在。' });
+      return res.status(404).json({ message: req.t('auth.userNotFound') });
     }
 
     const updatedUser = await User.findById(req.user.id);
     res.json({
       user: formatUserProfile(updatedUser),
-      message: '个人信息已更新。'
+      message: req.t('auth.profileUpdated')
     });
   } catch (err) {
     next(err);
@@ -337,21 +337,21 @@ exports.changePassword = async (req, res, next) => {
     const { oldPassword, newPassword, confirmPassword } = req.body;
 
     if (!oldPassword || !newPassword || !confirmPassword) {
-      return res.status(400).json({ message: '旧密码、新密码和确认密码不能为空。' });
+      return res.status(400).json({ message: req.t('auth.passwordFieldsRequired') });
     }
 
     if (newPassword !== confirmPassword) {
-      return res.status(400).json({ message: '两次输入的新密码不一致，请重新检查。' });
+      return res.status(400).json({ message: req.t('auth.passwordMismatch') });
     }
 
     const user = await User.findPasswordById(req.user.id);
     if (!user) {
-      return res.status(404).json({ message: '用户不存在。' });
+      return res.status(404).json({ message: req.t('auth.userNotFound') });
     }
 
     const isMatch = await bcrypt.compare(oldPassword, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ message: '旧密码不正确，请重新输入。' });
+      return res.status(401).json({ message: req.t('auth.oldPasswordIncorrect') });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -362,10 +362,10 @@ exports.changePassword = async (req, res, next) => {
     });
 
     if (affectedRows === 0) {
-      return res.status(404).json({ message: '用户不存在。' });
+      return res.status(404).json({ message: req.t('auth.userNotFound') });
     }
 
-    res.json({ message: '密码已修改。' });
+    res.json({ message: req.t('auth.passwordChanged') });
   } catch (err) {
     next(err);
   }
@@ -376,17 +376,17 @@ exports.login = async (req, res, next) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({ message: '用户名和密码不能为空。' });
+      return res.status(400).json({ message: req.t('auth.loginRequiredFields') });
     }
 
     const user = await User.findByUsername(username);
     if (!user) {
-      return res.status(401).json({ message: '用户名或密码不正确。' });
+      return res.status(401).json({ message: req.t('auth.invalidCredentials') });
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ message: '用户名或密码不正确。' });
+      return res.status(401).json({ message: req.t('auth.invalidCredentials') });
     }
 
     const token = jwt.sign(
@@ -402,7 +402,7 @@ exports.login = async (req, res, next) => {
         username: user.username,
         role: user.role
       },
-      message: '登录成功！'
+      message: req.t('auth.loginSuccess')
     });
   } catch (err) {
     next(err);
@@ -412,7 +412,7 @@ exports.login = async (req, res, next) => {
 exports.listStudents = async (req, res, next) => {
   try {
     if (!canUseTeacherFeatures(req.user)) {
-      return res.status(403).json({ message: '无权查看学生列表。' });
+      return res.status(403).json({ message: req.t('auth.studentsForbidden') });
     }
 
     const students = await User.listStudentsByTeacher(req.user.id);
@@ -425,7 +425,7 @@ exports.listStudents = async (req, res, next) => {
 exports.listMyClasses = async (req, res, next) => {
   try {
     if (!canUseTeacherFeatures(req.user)) {
-      return res.status(403).json({ message: '无权查看班级列表。' });
+      return res.status(403).json({ message: req.t('auth.classesForbidden') });
     }
 
     const classes = await Class.listByTeacherUserId(req.user.id);
@@ -438,12 +438,12 @@ exports.listMyClasses = async (req, res, next) => {
 exports.listStudentsByClass = async (req, res, next) => {
   try {
     if (!canUseTeacherFeatures(req.user)) {
-      return res.status(403).json({ message: '无权查看班级学生列表。' });
+      return res.status(403).json({ message: req.t('auth.classStudentsForbidden') });
     }
 
     const classCode = typeof req.params.classCode === 'string' ? req.params.classCode.trim() : '';
     if (!classCode) {
-      return res.status(400).json({ message: '班级码不能为空。' });
+      return res.status(400).json({ message: req.t('auth.classCodeRequired') });
     }
 
     const teacherClass = await Class.findByTeacherAndCode({
@@ -451,7 +451,7 @@ exports.listStudentsByClass = async (req, res, next) => {
       classCode
     });
     if (!teacherClass) {
-      return res.status(404).json({ message: '班级不存在或无权访问。' });
+      return res.status(404).json({ message: req.t('auth.classNotFoundOrForbidden') });
     }
 
     const students = await User.listStudentsByTeacherClass({

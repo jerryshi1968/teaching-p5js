@@ -164,6 +164,7 @@ const zhToEn = {
   '操作': 'Actions',
   '教师': 'Teacher',
   '管理员': 'Admin',
+  '小极客': 'Young Coder',
   '未填写': 'Not provided',
   '未分班': 'Unassigned',
   '无效：': 'Invalid: ',

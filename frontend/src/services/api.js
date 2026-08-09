@@ -1,7 +1,12 @@
 // 获取保存在 localStorage 的 token
+export const getLanguageHeader = () => {
+  const language = localStorage.getItem('teaching_language');
+  return { 'Accept-Language': language === 'en' ? 'en' : 'zh' };
+};
+
 export const getAuthHeader = () => {
   const token = localStorage.getItem('teaching_token');
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
+  return token ? { 'Authorization': `Bearer ${token}`, ...getLanguageHeader() } : getLanguageHeader();
 };
 
 // 示例：向后端拉取项目列表的方法
