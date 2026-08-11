@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, Edit2, ExternalLink, FileCode, History, Plus, Save, School, Trash2, Users, X } from 'lucide-react';
 import { createAdminClass, deleteAdminClass, exportAdminUsers, fetchAdminClasses, fetchAdminClassStudents, fetchAdminProjects, fetchAdminTeachers, fetchAdminTokenTransactions, fetchAdminUsers, rechargeAdminUserTokens, removeAdminClassStudent, updateAdminClass, updateAdminUserRole } from '../services/api';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const PAGE_SIZE = 10;
 
 const Admin = () => {
   const navigate = useNavigate();
+  const { isEnglish } = useLanguage();
   const [activeMenu, setActiveMenu] = useState('users');
   const [users, setUsers] = useState([]);
   const [page, setPage] = useState(1);
@@ -244,7 +246,7 @@ const Admin = () => {
   };
 
   const handleRechargeTokens = async (user) => {
-    const rawAmount = window.prompt(`请输入给 ${user.username || '该用户'} 充值的 Token 数量`, '100000');
+    const rawAmount = window.prompt(isEnglish ? `Enter the Token amount to recharge for ${user.username || 'this user'}` : `请输入给 ${user.username || '该用户'} 充值的 Token 数量`, '100000');
     if (rawAmount === null) return;
 
     const amount = Number.parseInt(rawAmount, 10);
@@ -342,7 +344,7 @@ const Admin = () => {
   };
 
   const handleDeleteClass = async (classItem) => {
-    if (!window.confirm(`确定删除班级“${classItem.name}”？该班级下学生会变为未分班。`)) return;
+    if (!window.confirm(isEnglish ? `Delete class "${classItem.name}"? Students in this class will become unassigned.` : `确定删除班级“${classItem.name}”？该班级下学生会变为未分班。`)) return;
 
     try {
       setClassDeletingId(classItem.id);
@@ -391,7 +393,7 @@ const Admin = () => {
 
   const handleRemoveClassStudent = async (student) => {
     if (!classStudentsDialog) return;
-    if (!window.confirm(`确定将「${student.username || '该学生'}」移出班级吗？`)) return;
+    if (!window.confirm(isEnglish ? `Remove "${student.username || 'this student'}" from the class?` : `确定将「${student.username || '该学生'}」移出班级吗？`)) return;
 
     try {
       setClassStudentsError('');

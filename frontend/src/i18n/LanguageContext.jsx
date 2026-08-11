@@ -3,11 +3,17 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 const LANGUAGE_STORAGE_KEY = 'teaching_language';
 const DEFAULT_LANGUAGE = 'zh';
 const SUPPORTED_LANGUAGES = ['zh', 'en'];
+const DOCUMENT_TITLES = {
+  zh: 'p5.js 青少年编程教学平台',
+  en: 'p5.js Youth Coding Platform'
+};
 
 const zhToEn = {
   '中文': 'Chinese',
   'English': 'English',
   '语言': 'Language',
+  'p5.js 创意编程乐园': 'p5.js Creative Coding Playground',
+  'p5.js 青少年编程教学平台': 'p5.js Youth Coding Platform',
   '用户登录': 'User Login',
   '新用户注册': 'New User Registration',
   '欢迎回来！': 'Welcome back!',
@@ -111,6 +117,7 @@ const zhToEn = {
   '保存名称': 'Save Name',
   '重命名失败': 'Rename Failed',
   '删除失败': 'Delete Failed',
+  '给这个作品组起个清楚的名字吧。': 'Give this project group a clear name.',
   '复制项目': 'Copy Project',
   '确认分发': 'Confirm Distribution',
   '排序失败': 'Sort Failed',
@@ -121,7 +128,9 @@ const zhToEn = {
   '目标作品组': 'Target Group',
   '根目录': 'Root',
   '正在移动...': 'Moving...',
+  '移动中...': 'Moving...',
   '移动': 'Move',
+  '确认移动': 'Confirm Move',
   '返回 Dashboard': 'Back to Dashboard',
   '管理': 'Admin',
   '用户管理': 'User Management',
@@ -140,7 +149,10 @@ const zhToEn = {
   '搜索': 'Search',
   '查找': 'Search',
   '清空': 'Clear',
+  '导出': 'Export',
+  '导出中...': 'Exporting...',
   '新建班级': 'New Class',
+  '编辑班级': 'Edit Class',
   '加载中...': 'Loading...',
   '暂无用户': 'No users',
   '暂无作品': 'No projects',
@@ -162,6 +174,22 @@ const zhToEn = {
   'TokenBalance': 'Token Balance',
   '创建时间': 'Created',
   '操作': 'Actions',
+  '导出用户列表失败，请重试。': 'Failed to export user list. Please try again.',
+  '获取用户列表失败，请重试。': 'Failed to load users. Please try again.',
+  '获取班级列表失败，请重试。': 'Failed to load classes. Please try again.',
+  '获取 Token 记录失败，请重试。': 'Failed to load token records. Please try again.',
+  '获取作品列表失败，请重试。': 'Failed to load projects. Please try again.',
+  '获取教师列表失败，请重试。': 'Failed to load teachers. Please try again.',
+  '修改用户角色失败，请重试。': 'Failed to update user role. Please try again.',
+  'Token 充值数量必须是正整数。': 'Token recharge amount must be a positive integer.',
+  'Token 充值失败，请重试。': 'Token recharge failed. Please try again.',
+  '班级名称不能为空。': 'Class name is required.',
+  '班级码必须为 4~10 位英文字母或数字。': 'Class code must be 4-10 letters or numbers.',
+  '请选择教师。': 'Please select a teacher.',
+  '保存班级失败，请重试。': 'Failed to save class. Please try again.',
+  '删除班级失败，请重试。': 'Failed to delete class. Please try again.',
+  '获取班级学生列表失败，请重试。': 'Failed to load class students. Please try again.',
+  '移除班级学生失败，请重试。': 'Failed to remove class student. Please try again.',
   '教师': 'Teacher',
   '管理员': 'Admin',
   '小极客': 'Young Coder',
@@ -169,6 +197,7 @@ const zhToEn = {
   '未分班': 'Unassigned',
   '无效：': 'Invalid: ',
   '充值': 'Recharge',
+  '充值中...': 'Recharging...',
   '消费': 'Consume',
   '消耗': 'Consume',
   '发生时间': 'Time',
@@ -192,6 +221,7 @@ const zhToEn = {
   '移除': 'Remove',
   '移除中...': 'Removing...',
   '学生列表': 'Student List',
+  '班级码：': 'Class code: ',
   '请选择教师': 'Please select a teacher',
   '保存': 'Save',
   '保存中...': 'Saving...',
@@ -277,6 +307,7 @@ const zhToEn = {
   '在新窗口打开': 'Open in new window',
   '加载失败': 'Load Failed',
   '保存成功': 'Saved',
+  '个人信息已经更新啦。': 'Profile updated.',
   '保存失败': 'Save Failed',
   '运行失败': 'Run Failed',
   '打开失败': 'Open Failed',
@@ -303,7 +334,8 @@ const zhToEn = {
   '管理员充值': 'Admin recharge',
   'AI 代码建议': 'AI code suggestion',
   '项目：': 'Project: ',
-  '模型：': 'Model: '
+  '模型：': 'Model: ',
+  '修改班级码会同步更新该班级下学生的班级码。': 'Changing the class code will also update it for students in this class.'
 };
 
 const enToZh = Object.fromEntries(Object.entries(zhToEn).map(([zh, en]) => [en, zh]));
@@ -408,6 +440,7 @@ const translateDocument = (language) => {
   if (!root) return;
 
   document.documentElement.lang = language === 'en' ? 'en' : 'zh-CN';
+  document.title = DOCUMENT_TITLES[language] || DOCUMENT_TITLES[DEFAULT_LANGUAGE];
   translateNode(root, language);
 };
 
