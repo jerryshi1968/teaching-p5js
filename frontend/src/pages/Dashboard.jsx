@@ -232,11 +232,13 @@ const Dashboard = () => {
   // 3. 创建新项目逻辑
   const handleCreateProject = async () => {
     const projectName = await appDialog.prompt({
-      title: '创建新作品',
-      message: '🎨 想要给你的新作品起个什么酷炫的名字呢？',
-      defaultValue: '我的奇妙创意',
-      placeholder: '请输入作品名称',
-      confirmText: '开始创作'
+      disableAutoTranslate: true,
+      title: isEnglish ? 'Create New Project' : '创建新作品',
+      message: isEnglish ? '🎨 What cool name should this new project have?' : '🎨 想要给你的新作品起个什么酷炫的名字呢？',
+      defaultValue: isEnglish ? 'My Amazing Idea' : '我的奇妙创意',
+      placeholder: isEnglish ? 'Enter a project name' : '请输入作品名称',
+      confirmText: isEnglish ? 'Start Creating' : '开始创作',
+      cancelText: isEnglish ? 'Cancel' : '取消'
     });
     if (!projectName || !projectName.trim()) return;
 

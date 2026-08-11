@@ -307,6 +307,7 @@ const EditorView = () => {
         : `确定导入「${exampleName}」吗？当前项目中的全部文件和未保存修改都会被替换，此操作无法撤销。`,
       highlight: isEnglish ? 'The project name will stay unchanged.' : '项目名称不会改变。',
       confirmText: isEnglish ? 'Replace and Import' : '替换并导入',
+      cancelText: isEnglish ? 'Cancel' : '取消',
       tone: 'danger'
     });
     if (!confirmed) return;
@@ -330,13 +331,15 @@ const EditorView = () => {
         title: isEnglish ? 'Example Imported' : '导入成功',
         message: isEnglish
           ? `"${exampleName}" has replaced the files in this project.`
-          : `「${exampleName}」已经替换当前项目中的文件。`
+          : `「${exampleName}」已经替换当前项目中的文件。`,
+        confirmText: isEnglish ? 'OK' : '知道啦'
       });
     } catch (err) {
       await appDialog.alert({
         disableAutoTranslate: true,
         title: isEnglish ? 'Import Failed' : '导入失败',
-        message: err.message
+        message: err.message,
+        confirmText: isEnglish ? 'OK' : '知道啦'
       });
     } finally {
       setImportingExample(false);
