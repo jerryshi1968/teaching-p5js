@@ -1,0 +1,23 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(to bottom, #0a0a1a, #1a1a3a);
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+}
+
+/* 游戏画布样式 */
+canvas {
+    display: block;
+    border: 3px solid #4fc3f7;
+    border-radius: 8px;
+    box-shadow: 0 0 30px rgba(79, 195, 247, 0.5);
+}

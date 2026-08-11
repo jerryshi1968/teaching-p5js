@@ -45,6 +45,7 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/project-groups', require('./routes/projectGroups'));
 app.use('/api/files', require('./routes/files'));
+app.use('/api/examples', require('./routes/examples'));
 app.use('/api/ai', require('./routes/ai'));
 
 // 4. 全局错误捕获中间件

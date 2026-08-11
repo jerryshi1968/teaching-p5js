@@ -1,0 +1,56 @@
+[
+  {
+    "id": "shapes-and-text",
+    "directory": "图形和文字",
+    "names": {
+      "zh": "图形和文字",
+      "en": "Shapes and Text"
+    },
+    "order": 1
+  },
+  {
+    "id": "windmill",
+    "directory": "大风车",
+    "names": {
+      "zh": "大风车",
+      "en": "Windmill"
+    },
+    "order": 2
+  },
+  {
+    "id": "bouncing-balls",
+    "directory": "弹球碰碰碰",
+    "names": {
+      "zh": "弹球碰碰碰",
+      "en": "Bouncing Balls"
+    },
+    "order": 3
+  },
+  {
+    "id": "tank-battle",
+    "directory": "坦克大战",
+    "names": {
+      "zh": "坦克大战",
+      "en": "Tank Battle"
+    },
+    "order": 4
+  },
+  {
+    "id": "animal-city",
+    "directory": "疯狂动物城",
+    "names": {
+      "zh": "疯狂动物城",
+      "en": "Animal City"
+    },
+    "order": 5
+  },
+  {
+    "id": "airplane-battle",
+    "directory": "飞机大战",
+    "names": {
+      "zh": "飞机大战",
+      "en": "Airplane Battle"
+    },
+    "order": 6
+  }
+]

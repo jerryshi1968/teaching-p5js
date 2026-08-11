@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import Split from 'react-split';
-import { ChevronLeft, ExternalLink, Play, Save, Sparkles, Wand2 } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronLeft, ExternalLink, Loader2, Play, Save, Sparkles, Wand2 } from 'lucide-react';
 import CodeEditor from '../components/Workspace/CodeEditor';
 import FileTree from '../components/Workspace/FileTree';
 import { useAppDialog } from '../hooks/useAppDialog';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const TEXT_EXTENSIONS = ['.html', '.htm', '.css', '.js', '.txt'];
 const CODE_FONT_SIZE_KEY = 'teaching_editor_code_font_size';
@@ -108,7 +109,9 @@ const EditorView = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const appDialog = useAppDialog();
+  const { language, isEnglish } = useLanguage();
   const iframeRef = useRef(null);
+  const exampleMenuRef = useRef(null);
   const dashboardGroupId = location.state?.dashboardGroupId ?? null;
 
   const [files, setFiles] = useState([]);
@@ -124,6 +127,12 @@ const EditorView = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
   const [pendingAiFiles, setPendingAiFiles] = useState(null);
+  const [examples, setExamples] = useState([]);
+  const [examplesLoaded, setExamplesLoaded] = useState(false);
+  const [examplesLoading, setExamplesLoading] = useState(false);
+  const [examplesError, setExamplesError] = useState('');
+  const [exampleMenuOpen, setExampleMenuOpen] = useState(false);
+  const [importingExample, setImportingExample] = useState(false);
   const [codeFontSize, setCodeFontSize] = useState(() => {
     const savedSize = localStorage.getItem(CODE_FONT_SIZE_KEY);
     return CODE_FONT_SIZES.includes(savedSize) ? savedSize : 'medium';
@@ -163,7 +172,9 @@ const EditorView = () => {
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.message || '操作失败，请稍后再试。');
+      const error = new Error(data.message || `操作失败（HTTP ${response.status}），请稍后再试。`);
+      error.status = response.status;
+      throw error;
     }
     return data;
   };
@@ -226,6 +237,111 @@ const EditorView = () => {
       handleRun();
     }
   }, [loading]);
+
+  useEffect(() => {
+    if (!exampleMenuOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!exampleMenuRef.current?.contains(event.target)) {
+        setExampleMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [exampleMenuOpen]);
+
+  const getExampleName = (example) => (
+    example?.names?.[language] || example?.names?.zh || example?.id || ''
+  );
+
+  const loadExamples = async () => {
+    if (examplesLoading) return;
+
+    setExamplesLoading(true);
+    setExamplesError('');
+    try {
+      let data;
+      try {
+        data = await requestJson('/api/projects/examples', {
+          headers: { 'Accept-Language': language }
+        });
+      } catch (err) {
+        if (err.status !== 404) throw err;
+        data = await requestJson('/api/examples', {
+          headers: { 'Accept-Language': language }
+        });
+      }
+      setExamples(Array.isArray(data) ? data : []);
+      setExamplesLoaded(true);
+    } catch (err) {
+      setExamplesError(err.message);
+    } finally {
+      setExamplesLoading(false);
+    }
+  };
+
+  const handleToggleExampleMenu = async () => {
+    if (!canEdit || saving || importingExample) return;
+
+    if (exampleMenuOpen) {
+      setExampleMenuOpen(false);
+      return;
+    }
+
+    setExampleMenuOpen(true);
+    if (examplesLoaded || examplesLoading) return;
+    await loadExamples();
+  };
+
+  const handleImportExample = async (example) => {
+    if (!canEdit || saving || importingExample) return;
+
+    setExampleMenuOpen(false);
+    const exampleName = getExampleName(example);
+    const confirmed = await appDialog.confirm({
+      disableAutoTranslate: true,
+      title: isEnglish ? 'Import Example' : '导入例子程序',
+      message: isEnglish
+        ? `Import "${exampleName}"? Every file in the current project, including unsaved changes, will be replaced. This action cannot be undone.`
+        : `确定导入「${exampleName}」吗？当前项目中的全部文件和未保存修改都会被替换，此操作无法撤销。`,
+      highlight: isEnglish ? 'The project name will stay unchanged.' : '项目名称不会改变。',
+      confirmText: isEnglish ? 'Replace and Import' : '替换并导入',
+      tone: 'danger'
+    });
+    if (!confirmed) return;
+
+    setImportingExample(true);
+    try {
+      await requestJson(`/api/projects/${projectId}/import-example`, {
+        method: 'POST',
+        headers: { 'Accept-Language': language },
+        body: JSON.stringify({ exampleId: example.id })
+      });
+      setPendingAiFiles(null);
+      setAiMessages([]);
+      setAiImages([]);
+      setAiInput('');
+      setActiveFileId(null);
+      await loadProjectFiles();
+      setPreviewUrl(getProjectPreviewUrl());
+      await appDialog.alert({
+        disableAutoTranslate: true,
+        title: isEnglish ? 'Example Imported' : '导入成功',
+        message: isEnglish
+          ? `"${exampleName}" has replaced the files in this project.`
+          : `「${exampleName}」已经替换当前项目中的文件。`
+      });
+    } catch (err) {
+      await appDialog.alert({
+        disableAutoTranslate: true,
+        title: isEnglish ? 'Import Failed' : '导入失败',
+        message: err.message
+      });
+    } finally {
+      setImportingExample(false);
+    }
+  };
 
   const saveFilesToServer = async (filesToSave) => {
     if (!canEdit) return;
@@ -707,13 +823,69 @@ const EditorView = () => {
               </span>
             )}
           </div>
+          <div ref={exampleMenuRef} data-i18n-skip className="relative">
+            <button
+              type="button"
+              onClick={handleToggleExampleMenu}
+              disabled={!canEdit || saving || importingExample}
+              className="flex items-center gap-1.5 rounded-xl border-2 border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-45"
+              title={canEdit ? (isEnglish ? 'Import an example program' : '导入例子程序') : (isEnglish ? 'Read-only projects cannot import examples' : '只读项目不能导入例子')}
+            >
+              {importingExample ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookOpen className="h-4 w-4" />}
+              <span>{importingExample ? (isEnglish ? 'Importing...' : '正在导入...') : (isEnglish ? 'Import Example' : '导入例子')}</span>
+              <ChevronDown className={`h-3.5 w-3.5 transition ${exampleMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {exampleMenuOpen && (
+              <div className="absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl border-2 border-indigo-100 bg-white p-2 shadow-[0_16px_40px_rgba(15,23,42,0.18)]">
+                <div className="px-2 pb-2 pt-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  {isEnglish ? 'Choose an example' : '选择例子程序'}
+                </div>
+                {examplesLoading ? (
+                  <div className="flex items-center justify-center gap-2 px-3 py-5 text-xs font-bold text-slate-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>{isEnglish ? 'Loading...' : '加载中...'}</span>
+                  </div>
+                ) : examplesError ? (
+                  <div className="rounded-xl bg-rose-50 px-3 py-3 text-center">
+                    <div className="text-[11px] font-bold leading-5 text-rose-600">{examplesError}</div>
+                    <button
+                      type="button"
+                      onClick={loadExamples}
+                      className="mt-2 rounded-lg bg-rose-100 px-3 py-1.5 text-[11px] font-black text-rose-700 transition hover:bg-rose-200"
+                    >
+                      {isEnglish ? 'Try Again' : '重新加载'}
+                    </button>
+                  </div>
+                ) : examples.length > 0 ? (
+                  <div className="max-h-72 space-y-1 overflow-y-auto">
+                    {examples.map((example) => (
+                      <button
+                        key={example.id}
+                        type="button"
+                        onClick={() => handleImportExample(example)}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-black text-slate-600 transition hover:bg-indigo-50 hover:text-indigo-700"
+                      >
+                        <BookOpen className="h-4 w-4 shrink-0 text-indigo-400" />
+                        <span className="truncate">{getExampleName(example)}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-3 py-5 text-center text-xs font-bold text-slate-400">
+                    {isEnglish ? 'No examples are available.' : '暂时没有可用的例子程序。'}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center space-x-3">
           <button
             type="button"
             onClick={handleSaveActiveFile}
-            disabled={saving || !canEdit || !isEditableTextFile(activeFile)}
+            disabled={saving || importingExample || !canEdit || !isEditableTextFile(activeFile)}
             className="flex items-center space-x-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 px-4 py-2 rounded-2xl text-xs font-black border-b-4 border-amber-600 active:border-b-0 active:translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
@@ -722,7 +894,7 @@ const EditorView = () => {
           <button
             type="button"
             onClick={handleRun}
-            disabled={saving}
+            disabled={saving || importingExample}
             className="flex items-center space-x-1.5 bg-emerald-400 hover:bg-emerald-300 text-white px-5 py-2 rounded-2xl text-xs font-black border-b-4 border-emerald-600 active:border-b-0 active:translate-y-1 transition-all shadow-sm disabled:opacity-50"
           >
             <Play className="w-4 h-4 fill-current" />

@@ -96,6 +96,14 @@ exports.findOwnedById = async (projectId, userId) => {
   return rows[0] || null;
 };
 
+exports.findOwnedByIdWithConnection = async (connection, projectId, userId) => {
+  const [rows] = await connection.query(
+    'SELECT id, user_id, parent_id, sort_order FROM projects WHERE id = ? AND user_id = ? FOR UPDATE',
+    [projectId, userId]
+  );
+  return rows[0] || null;
+};
+
 exports.findAccessibleById = async (projectId, user) => {
   if (canAccessAllProjects(user)) {
     const [rows] = await db.query('SELECT id, name, user_id FROM projects WHERE id = ?', [projectId]);

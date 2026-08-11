@@ -7,6 +7,11 @@ exports.createWithConnection = async (connection, { projectId, name, path }) => 
   );
 };
 
+exports.deleteByProjectIdWithConnection = async (connection, projectId) => {
+  const [result] = await connection.query('DELETE FROM files WHERE project_id = ?', [projectId]);
+  return result.affectedRows;
+};
+
 exports.findByProjectId = async (projectId) => {
   const [rows] = await db.query(
     'SELECT id, name, path FROM files WHERE project_id = ? ORDER BY path ASC',

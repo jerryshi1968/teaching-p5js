@@ -150,6 +150,26 @@ const messages = {
     zh: '无权访问管理页面。',
     en: 'You do not have permission to access the admin page.'
   },
+  'examples.projectNotFound': {
+    zh: '项目不存在或无权导入例子。',
+    en: 'The project does not exist or you cannot import an example into it.'
+  },
+  'examples.idRequired': {
+    zh: '请选择要导入的例子程序。',
+    en: 'Please select an example to import.'
+  },
+  'examples.notFound': {
+    zh: '所选例子程序不存在。',
+    en: 'The selected example does not exist.'
+  },
+  'examples.projectDirectoryInvalid': {
+    zh: '项目磁盘目录不正确，无法导入例子。',
+    en: 'The project storage directory is invalid, so the example cannot be imported.'
+  },
+  'examples.importSuccess': {
+    zh: '例子程序已导入。',
+    en: 'The example was imported.'
+  },
   'server.unexpected': {
     zh: '服务器发生未知错误。',
     en: 'An unexpected internal error occurred.'
