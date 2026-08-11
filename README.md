@@ -18,14 +18,16 @@ English version: [README-en.md](./README-en.md)
 - 用户注册与登录：基于 JWT 的接口认证，支持个人资料、手机号、性别、生日、班级码和密码维护。
 - 滑块验证码与短信验证码：注册、修改手机号前需要完成滑块验证和阿里云短信验证码校验，并记录发送频率。
 - 学生作品管理：创建、重命名、删除、复制、移动、排序 p5.js 作品。
-- 作品分组管理：支持多级作品组、面包屑导航、组内排序和移动。
+- 作品分组管理：支持多级作品组、面包屑导航、组内排序、移动和拖拽调整位置。
+- 示例程序库：内置图形和文字、大风车、弹球碰碰碰、坦克大战、疯狂动物城、飞机大战等 p5.js 示例，可导入到当前作品。
 - 在线代码编辑：基于 CodeMirror，支持 HTML、JavaScript、CSS、TXT 文本文件编辑。
 - 文件树与资源管理：支持创建文本文件、创建文件夹、上传图片/音频/视频等资源、重命名和删除文件。
 - 实时预览：运行时自动保存文本文件，通过 iframe 或独立窗口预览 p5.js 作品。
 - 教师督导：教师/管理员可查看绑定班级的学生列表和学生项目，以只读方式进入作品。
 - 项目分发：教师可将自己的项目批量复制到当前班级的学生账户下。
-- 管理后台：管理员可分页查询用户、调整学生/教师角色、给用户充值 AI Token、查看 Token 流水、管理班级、查看全站作品。
+- 管理后台：管理员可分页查询用户、导出用户 CSV、调整学生/教师角色、给用户充值 AI Token、查看 Token 流水、管理班级、查看全站作品。
 - AI 代码助手：已登录用户可消耗 Token 调用 Gemini 兼容接口生成 p5.js 代码修改建议，支持最多 3 张图片作为参考。
+- 双语支持：前端支持中英文界面，后端通过 `Accept-Language` / `X-Language` 返回中英文错误消息。
 - 本地物理文件存储：项目文件元数据写入 MySQL，真实文件保存在 `backend/storage/projects/<project-id>/`。
 
 ## 界面预览
@@ -52,6 +54,7 @@ English version: [README-en.md](./README-en.md)
 - React Router 6
 - Tailwind CSS
 - CodeMirror 6
+- @dnd-kit
 - lucide-react
 - react-split
 
@@ -66,6 +69,7 @@ English version: [README-en.md](./README-en.md)
 - dotenv
 - 阿里云短信服务
 - Gemini 兼容 AI 接口
+- 轻量级后端 i18n 工具
 
 ## 项目结构
 
@@ -80,12 +84,14 @@ teaching-p5js/
 │   │   ├── adminController.js
 │   │   ├── aiController.js
 │   │   ├── authController.js
+│   │   ├── exampleController.js
 │   │   ├── fileController.js
 │   │   ├── projectController.js
 │   │   └── projectGroupController.js
 │   ├── middleware/
 │   │   ├── adminMiddleware.js
 │   │   ├── authMiddleware.js
+│   │   ├── languageMiddleware.js
 │   │   └── securityMiddleware.js
 │   ├── models/
 │   │   ├── classModel.js
@@ -99,12 +105,17 @@ teaching-p5js/
 │   │   ├── admin.js
 │   │   ├── ai.js
 │   │   ├── auth.js
+│   │   ├── examples.js
 │   │   ├── files.js
 │   │   ├── projectGroups.js
 │   │   └── projects.js
 │   ├── services/
+│   │   ├── exampleService.js
 │   │   └── smsService.js
+│   ├── utils/
+│   │   └── i18n.js
 │   └── storage/
+│       ├── examples/
 │       └── projects/
 ├── frontend/
 │   ├── index.html
@@ -125,8 +136,12 @@ teaching-p5js/
 │       └── services/
 ├── docs/
 │   └── images/
+│       ├── p5js-intro.gif
+│       ├── admin-en.jpg
 │       ├── admin.jpg
+│       ├── dashboard-en.jpg
 │       ├── dashboard.jpg
+│       ├── editor-en.jpg
 │       └── editor.jpg
 ├── setup_project.sh
 ├── README-en.md
@@ -429,11 +444,21 @@ Authorization: Bearer <token>
 | `POST`   | `/api/projects/copy`                    | 复制可访问项目到当前用户                |
 | `POST`   | `/api/projects/:id/copy`                | 复制指定项目到当前用户                 |
 | `POST`   | `/api/projects/:id/distribute-to-class` | 教师将项目分发给班级学生                |
+| `GET`    | `/api/projects/examples`                | 获取可导入的内置示例程序列表              |
+| `POST`   | `/api/projects/:id/import-example`      | 将内置示例程序导入当前用户自己的项目         |
 | `PUT`    | `/api/projects/reorder`                 | 调整当前目录下项目排序                 |
 | `GET`    | `/api/projects/:id`                     | 获取单个项目信息和编辑权限               |
 | `PUT`    | `/api/projects/:id`                     | 修改项目名称                      |
-| `PUT`    | `/api/projects/:id/move`                | 移动项目到其他作品组                  |
+| `PUT`    | `/api/projects/:id/move`                | 移动项目到其他作品组，也支持 `beforeId` 拖拽定位 |
+| `PUT`    | `/api/projects/:id/reposition`          | 移动项目并按 `beforeId` 定位，`/move` 的别名 |
 | `DELETE` | `/api/projects/:id`                     | 删除项目及物理文件                   |
+
+### 示例程序
+
+| 方法    | 路径                   | 说明               |
+| ----- | -------------------- | ---------------- |
+| `GET` | `/api/examples`      | 获取可导入的内置示例程序列表 |
+| `GET` | `/api/projects/examples` | 获取可导入的内置示例程序列表 |
 
 ### 作品组
 
@@ -444,7 +469,8 @@ Authorization: Bearer <token>
 | `POST`   | `/api/project-groups`          | 创建作品组                                     |
 | `PUT`    | `/api/project-groups/reorder`  | 调整作品组排序                                   |
 | `PUT`    | `/api/project-groups/:id`      | 修改作品组名称                                   |
-| `PUT`    | `/api/project-groups/:id/move` | 移动作品组                                     |
+| `PUT`    | `/api/project-groups/:id/move` | 移动作品组，也支持 `beforeId` 拖拽定位                    |
+| `PUT`    | `/api/project-groups/:id/reposition` | 移动作品组并按 `beforeId` 定位，`/move` 的别名              |
 | `DELETE` | `/api/project-groups/:id`      | 删除空作品组                                    |
 
 ### 文件
@@ -469,6 +495,7 @@ Authorization: Bearer <token>
 | 方法       | 路径                                           | 说明             |
 | -------- | -------------------------------------------- | -------------- |
 | `GET`    | `/api/admin/users`                           | 分页查询用户         |
+| `GET`    | `/api/admin/users/export`                    | 导出用户 CSV，可按用户名筛选 |
 | `PUT`    | `/api/admin/users/:id/role`                  | 修改用户角色，支持学生/教师 |
 | `POST`   | `/api/admin/users/:id/tokens/recharge`       | 给用户充值 AI Token |
 | `PATCH`  | `/api/admin/users/:id/tokens/recharge`       | 给用户充值 AI Token |
@@ -508,6 +535,31 @@ backend/storage/projects/<project-id>/
 <script src="/teaching-p5js/libs/p5-1.11.13.min.js"></script>
 ```
 
+## 示例程序库
+
+内置示例程序位于：
+
+```text
+backend/storage/examples/
+```
+
+示例清单由下面的文件维护：
+
+```text
+backend/storage/examples/manifest.json
+```
+
+当前内置示例包括：
+
+- 图形和文字
+- 大风车
+- 弹球碰碰碰
+- 坦克大战
+- 疯狂动物城
+- 飞机大战
+
+导入示例会把示例目录复制到当前用户自己的项目目录，并重建该项目的 `files` 表记录；导入前请确认当前项目内原有文件可以被替换。
+
 ## 数据模型关系
 
 - `users` 是核心用户表，使用 `role` 区分 `student`、`teacher`、`admin`，并用 `tokens` 记录 AI 可用余额。
@@ -518,6 +570,12 @@ backend/storage/projects/<project-id>/
 - `captcha_challenges` 记录滑块验证码挑战、验证状态和一次性短信前置 token。
 - `sms_send_logs` 记录手机号/IP 的短信发送日志，用于频率限制。
 - `token_transactions` 记录管理员充值和 AI 消耗流水，便于追踪余额变动。
+
+## 多语言
+
+- 前端语言偏好保存在 `localStorage` 的 `teaching_language`。
+- 前端请求会携带 `Accept-Language`，后端 `languageMiddleware` 会解析 `Accept-Language` 或 `X-Language`。
+- 后端内置 `zh` / `en` 两套基础消息，主要覆盖认证、示例导入、权限和通用服务器错误。
 
 ## 前端路由
 
@@ -575,6 +633,7 @@ npm start
 
 - 当前项目没有内置数据库迁移工具，首次部署需要手动建库建表。
 - `files` 表只保存文件元数据，文件内容以物理文件形式存储。
+- 示例程序目录 `backend/storage/examples` 是内置教学素材，导入时会复制到用户项目目录。
 - `index.html` 不允许在文件管理中删除或重命名，以保证项目预览入口稳定。
 - 教师查看学生项目时默认只读；复制后会生成归属于教师自己的新项目。
 - AI 代码助手只允许修改 `index.html`、`style.css`、`sketch.js`，并要求返回 JSON 格式的建议。

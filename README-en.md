@@ -18,17 +18,21 @@ Demo website link: [https://tigao123.com/teaching-p5js](https://tigao123.com/tea
 - User registration and login: JWT-based API authentication, with profile, phone number, gender, birthday, class code, and password management.
 - Slider captcha and SMS verification: registration and phone updates require a slider challenge and Aliyun SMS code verification, with send-frequency logs.
 - Student project management: create, rename, delete, copy, move, and reorder p5.js projects.
-- Project group management: nested project groups, breadcrumbs, sorting, and moving between groups.
+- Project group management: nested project groups, breadcrumbs, sorting, moving, and drag-and-drop repositioning.
+- Built-in example library: import p5.js examples such as Shapes and Text, Windmill, Bouncing Balls, Tank Battle, Animal City, and Airplane Battle into the current project.
 - Online code editing: CodeMirror-based editing for HTML, JavaScript, CSS, and TXT files.
 - File tree and asset management: create text files, create folders, upload assets such as images/audio/video, rename entries, and delete entries.
 - Live preview: text files are saved before running, then previewed in an iframe or a separate browser window.
 - Teacher review workflow: teachers and admins can view students in their assigned classes and open student projects in read-only mode.
 - Project distribution: teachers can copy one of their own projects to every student in a selected class.
-- Admin dashboard: admins can page through users, update student/teacher roles, recharge AI Tokens, inspect Token transactions, manage classes, and view all projects.
+- Admin dashboard: admins can page through users, export users as CSV, update student/teacher roles, recharge AI Tokens, inspect Token transactions, manage classes, and view all projects.
 - AI code assistant: authenticated users can spend Tokens to request Gemini-compatible p5.js code suggestions, optionally with up to 3 reference images.
+- Bilingual support: the frontend supports Chinese and English, and the backend returns localized messages through `Accept-Language` / `X-Language`.
 - Local file storage: project metadata is stored in MySQL, while real project files live under `backend/storage/projects/<project-id>/`.
 
 ## Screenshots
+
+![teaching-p5js demo](./docs/images/p5js-intro.gif)
 
 ### Dashboard
 
@@ -51,6 +55,7 @@ Demo website link: [https://tigao123.com/teaching-p5js](https://tigao123.com/tea
 - React Router 6
 - Tailwind CSS
 - CodeMirror 6
+- @dnd-kit
 - lucide-react
 - react-split
 
@@ -65,6 +70,7 @@ Demo website link: [https://tigao123.com/teaching-p5js](https://tigao123.com/tea
 - dotenv
 - Aliyun SMS service
 - Gemini-compatible AI API
+- Lightweight backend i18n utility
 
 ## Project Structure
 
@@ -79,12 +85,14 @@ teaching-p5js/
 │   │   ├── adminController.js
 │   │   ├── aiController.js
 │   │   ├── authController.js
+│   │   ├── exampleController.js
 │   │   ├── fileController.js
 │   │   ├── projectController.js
 │   │   └── projectGroupController.js
 │   ├── middleware/
 │   │   ├── adminMiddleware.js
 │   │   ├── authMiddleware.js
+│   │   ├── languageMiddleware.js
 │   │   └── securityMiddleware.js
 │   ├── models/
 │   │   ├── classModel.js
@@ -98,12 +106,17 @@ teaching-p5js/
 │   │   ├── admin.js
 │   │   ├── ai.js
 │   │   ├── auth.js
+│   │   ├── examples.js
 │   │   ├── files.js
 │   │   ├── projectGroups.js
 │   │   └── projects.js
 │   ├── services/
+│   │   ├── exampleService.js
 │   │   └── smsService.js
+│   ├── utils/
+│   │   └── i18n.js
 │   └── storage/
+│       ├── examples/
 │       └── projects/
 ├── frontend/
 │   ├── index.html
@@ -124,8 +137,12 @@ teaching-p5js/
 │       └── services/
 ├── docs/
 │   └── images/
+│       ├── p5js-intro.gif
 │       ├── admin-en.jpg
+│       ├── admin.jpg
 │       ├── dashboard-en.jpg
+│       ├── dashboard.jpg
+│       ├── editor.jpg
 │       └── editor-en.jpg
 ├── setup_project.sh
 ├── README-en.md
@@ -428,11 +445,21 @@ Authorization: Bearer <token>
 | `POST` | `/api/projects/copy` | Copy an accessible project to the current user |
 | `POST` | `/api/projects/:id/copy` | Copy a specified project to the current user |
 | `POST` | `/api/projects/:id/distribute-to-class` | Teacher: distribute a project to class students |
+| `GET` | `/api/projects/examples` | List built-in example programs that can be imported |
+| `POST` | `/api/projects/:id/import-example` | Import a built-in example into the current user's own project |
 | `PUT` | `/api/projects/reorder` | Reorder projects in the current directory |
 | `GET` | `/api/projects/:id` | Get project details and edit permission |
 | `PUT` | `/api/projects/:id` | Rename a project |
-| `PUT` | `/api/projects/:id/move` | Move a project into another project group |
+| `PUT` | `/api/projects/:id/move` | Move a project into another project group, also supports `beforeId` for drag positioning |
+| `PUT` | `/api/projects/:id/reposition` | Move and position a project by `beforeId`; alias of `/move` |
 | `DELETE` | `/api/projects/:id` | Delete a project and its physical files |
+
+### Examples
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/examples` | List built-in example programs that can be imported |
+| `GET` | `/api/projects/examples` | List built-in example programs that can be imported |
 
 ### Project Groups
 
@@ -443,7 +470,8 @@ Authorization: Bearer <token>
 | `POST` | `/api/project-groups` | Create a project group |
 | `PUT` | `/api/project-groups/reorder` | Reorder project groups |
 | `PUT` | `/api/project-groups/:id` | Rename a project group |
-| `PUT` | `/api/project-groups/:id/move` | Move a project group |
+| `PUT` | `/api/project-groups/:id/move` | Move a project group, also supports `beforeId` for drag positioning |
+| `PUT` | `/api/project-groups/:id/reposition` | Move and position a project group by `beforeId`; alias of `/move` |
 | `DELETE` | `/api/project-groups/:id` | Delete an empty project group |
 
 ### Files
@@ -468,6 +496,7 @@ Authorization: Bearer <token>
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/api/admin/users` | Page through users |
+| `GET` | `/api/admin/users/export` | Export users as CSV, optionally filtered by username |
 | `PUT` | `/api/admin/users/:id/role` | Update a user role, limited to student/teacher |
 | `POST` | `/api/admin/users/:id/tokens/recharge` | Recharge AI Tokens for a user |
 | `PATCH` | `/api/admin/users/:id/tokens/recharge` | Recharge AI Tokens for a user |
@@ -507,6 +536,31 @@ The default `index.html` uses the bundled p5.js library:
 <script src="/teaching-p5js/libs/p5-1.11.13.min.js"></script>
 ```
 
+## Example Library
+
+Built-in example programs are stored in:
+
+```text
+backend/storage/examples/
+```
+
+The example manifest is maintained here:
+
+```text
+backend/storage/examples/manifest.json
+```
+
+Current examples include:
+
+- Shapes and Text
+- Windmill
+- Bouncing Balls
+- Tank Battle
+- Animal City
+- Airplane Battle
+
+Importing an example copies the example directory into the current user's project directory and rebuilds that project's `files` records. Make sure the existing files in the target project can be replaced before importing.
+
 ## Data Model Relationships
 
 - `users` is the central user table. `role` distinguishes `student`, `teacher`, and `admin`; `tokens` stores the user's AI balance.
@@ -517,6 +571,12 @@ The default `index.html` uses the bundled p5.js library:
 - `captcha_challenges` stores slider captcha challenges, verification status, and one-time SMS precondition tokens.
 - `sms_send_logs` records phone/IP SMS send events for rate limiting.
 - `token_transactions` records admin recharges and AI consumption so balance changes can be audited.
+
+## Internationalization
+
+- The frontend stores language preference in `localStorage` as `teaching_language`.
+- Frontend requests send `Accept-Language`; backend `languageMiddleware` resolves `Accept-Language` or `X-Language`.
+- The backend includes basic `zh` / `en` messages for authentication, example import, permissions, and generic server errors.
 
 ## Frontend Routes
 
@@ -574,6 +634,7 @@ Deployment notes:
 
 - The project does not include a database migration tool. First-time deployment requires manually creating the database and tables.
 - The `files` table stores metadata only; file content is stored as physical files.
+- `backend/storage/examples` contains built-in teaching examples. Importing an example copies it into the user's project directory.
 - `index.html` cannot be deleted or renamed through file management, so the project preview entry point remains stable.
 - Teachers open student projects in read-only mode by default; copying a student project creates a new project owned by the teacher.
 - The AI code assistant may only modify `index.html`, `style.css`, and `sketch.js`, and it expects JSON-formatted suggestions.
