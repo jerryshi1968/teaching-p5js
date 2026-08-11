@@ -18,6 +18,7 @@ router.post('/:id/distribute-to-class', projectController.distributeProjectToCla
 router.delete('/:id', projectController.deleteProject);
 router.get('/:id', projectController.getProjectById);
 router.put('/:id/move', projectController.moveProject);
+router.put('/:id/reposition', projectController.repositionProject);
 router.put('/:id', projectController.updateProject);
 
 module.exports = router;

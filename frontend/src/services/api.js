@@ -104,6 +104,24 @@ export const moveProjectGroup = async (groupId, { parentId = null }) => {
   return data;
 };
 
+export const repositionProjectGroup = async (groupId, { parentId = null, beforeId = null }) => {
+  const response = await fetch(`/api/project-groups/${groupId}/move`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify({ parentId, beforeId })
+  });
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error('移动接口未正确响应，请重启后端服务后重试。');
+  }
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || `调整作品组位置失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
 export const reorderProjectGroups = async ({ parentId = null, orderedIds }) => {
   const response = await fetch('/api/project-groups/reorder', {
     method: 'PUT',
@@ -143,6 +161,24 @@ export const moveProject = async (projectId, { parentId = null }) => {
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data?.message || `移动项目失败（HTTP ${response.status}），请重试。`);
+  return data;
+};
+
+export const repositionProject = async (projectId, { parentId = null, beforeId = null }) => {
+  const response = await fetch(`/api/projects/${projectId}/move`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
+    },
+    body: JSON.stringify({ parentId, beforeId })
+  });
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error('移动接口未正确响应，请重启后端服务后重试。');
+  }
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || `调整项目位置失败（HTTP ${response.status}），请重试。`);
   return data;
 };
 

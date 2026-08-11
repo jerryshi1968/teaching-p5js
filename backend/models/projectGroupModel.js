@@ -69,6 +69,104 @@ exports.move = async ({ id, userId, parentId = null }) => {
   return result.affectedRows;
 };
 
+exports.reposition = async ({ id, userId, parentId = null, beforeId = null }) => {
+  const connection = await db.getConnection();
+
+  const listSiblingIds = async (siblingParentId) => {
+    const [rows] = await connection.query(
+      `SELECT id FROM project_groups WHERE user_id = ? AND ${siblingParentId === null ? 'parent_id IS NULL' : 'parent_id = ?'} ORDER BY sort_order ASC, created_at DESC, id DESC FOR UPDATE`,
+      siblingParentId === null ? [userId] : [userId, siblingParentId]
+    );
+    return rows.map((row) => Number(row.id));
+  };
+
+  const updateSiblingOrder = async (siblingParentId, orderedIds) => {
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      await connection.query(
+        `UPDATE project_groups SET sort_order = ? WHERE id = ? AND user_id = ? AND ${siblingParentId === null ? 'parent_id IS NULL' : 'parent_id = ?'}`,
+        siblingParentId === null ? [index, orderedIds[index], userId] : [index, orderedIds[index], userId, siblingParentId]
+      );
+    }
+  };
+
+  try {
+    await connection.beginTransaction();
+
+    const [sourceRows] = await connection.query(
+      'SELECT id, parent_id FROM project_groups WHERE id = ? AND user_id = ? FOR UPDATE',
+      [id, userId]
+    );
+    const sourceGroup = sourceRows[0];
+    if (!sourceGroup) {
+      await connection.rollback();
+      return { status: 'not_found' };
+    }
+
+    if (parentId === id) {
+      await connection.rollback();
+      return { status: 'invalid_parent' };
+    }
+
+    if (parentId !== null) {
+      const [parentRows] = await connection.query(
+        'SELECT id FROM project_groups WHERE id = ? AND user_id = ? FOR UPDATE',
+        [parentId, userId]
+      );
+      if (!parentRows[0]) {
+        await connection.rollback();
+        return { status: 'invalid_parent' };
+      }
+
+      const [descendantRows] = await connection.query(
+        `WITH RECURSIVE group_tree AS (
+           SELECT id FROM project_groups WHERE id = ? AND user_id = ?
+           UNION ALL
+           SELECT pg.id FROM project_groups pg
+           JOIN group_tree gt ON pg.parent_id = gt.id
+           WHERE pg.user_id = ?
+         )
+         SELECT id FROM group_tree WHERE id = ? LIMIT 1`,
+        [id, userId, userId, parentId]
+      );
+      if (descendantRows.length > 0) {
+        await connection.rollback();
+        return { status: 'descendant' };
+      }
+    }
+
+    const sourceParentId = sourceGroup.parent_id === null ? null : Number(sourceGroup.parent_id);
+    const sourceIds = await listSiblingIds(sourceParentId);
+    const targetIds = sourceParentId === parentId ? sourceIds : await listSiblingIds(parentId);
+    const nextTargetIds = targetIds.filter((groupId) => groupId !== id);
+
+    if (beforeId !== null && !nextTargetIds.includes(beforeId)) {
+      await connection.rollback();
+      return { status: 'invalid_before' };
+    }
+
+    const insertIndex = beforeId === null ? nextTargetIds.length : nextTargetIds.indexOf(beforeId);
+    nextTargetIds.splice(insertIndex, 0, id);
+
+    await connection.query(
+      'UPDATE project_groups SET parent_id = ? WHERE id = ? AND user_id = ?',
+      [parentId, id, userId]
+    );
+
+    if (sourceParentId !== parentId) {
+      await updateSiblingOrder(sourceParentId, sourceIds.filter((groupId) => groupId !== id));
+    }
+    await updateSiblingOrder(parentId, nextTargetIds);
+
+    await connection.commit();
+    return { status: 'updated' };
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+};
+
 exports.reorder = async ({ userId, parentId = null, orderedIds }) => {
   const connection = await db.getConnection();
 

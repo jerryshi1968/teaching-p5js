@@ -183,6 +183,83 @@ exports.move = async ({ projectId, userId, parentId = null }) => {
   return result.affectedRows;
 };
 
+exports.reposition = async ({ projectId, userId, parentId = null, beforeId = null }) => {
+  const connection = await db.getConnection();
+
+  const listSiblingIds = async (siblingParentId) => {
+    const [rows] = await connection.query(
+      `SELECT id FROM projects WHERE user_id = ? AND ${siblingParentId === null ? 'parent_id IS NULL' : 'parent_id = ?'} ORDER BY sort_order ASC, updated_at DESC FOR UPDATE`,
+      siblingParentId === null ? [userId] : [userId, siblingParentId]
+    );
+    return rows.map((row) => String(row.id));
+  };
+
+  const updateSiblingOrder = async (siblingParentId, orderedIds) => {
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      await connection.query(
+        `UPDATE projects SET sort_order = ?, updated_at = updated_at WHERE id = ? AND user_id = ? AND ${siblingParentId === null ? 'parent_id IS NULL' : 'parent_id = ?'}`,
+        siblingParentId === null ? [index, orderedIds[index], userId] : [index, orderedIds[index], userId, siblingParentId]
+      );
+    }
+  };
+
+  try {
+    await connection.beginTransaction();
+
+    const [sourceRows] = await connection.query(
+      'SELECT id, parent_id FROM projects WHERE id = ? AND user_id = ? FOR UPDATE',
+      [projectId, userId]
+    );
+    const sourceProject = sourceRows[0];
+    if (!sourceProject) {
+      await connection.rollback();
+      return { status: 'not_found' };
+    }
+
+    if (parentId !== null) {
+      const [parentRows] = await connection.query(
+        'SELECT id FROM project_groups WHERE id = ? AND user_id = ? FOR UPDATE',
+        [parentId, userId]
+      );
+      if (!parentRows[0]) {
+        await connection.rollback();
+        return { status: 'invalid_parent' };
+      }
+    }
+
+    const sourceParentId = sourceProject.parent_id === null ? null : Number(sourceProject.parent_id);
+    const sourceIds = await listSiblingIds(sourceParentId);
+    const targetIds = sourceParentId === parentId ? sourceIds : await listSiblingIds(parentId);
+    const nextTargetIds = targetIds.filter((id) => id !== projectId);
+
+    if (beforeId !== null && !nextTargetIds.includes(beforeId)) {
+      await connection.rollback();
+      return { status: 'invalid_before' };
+    }
+
+    const insertIndex = beforeId === null ? nextTargetIds.length : nextTargetIds.indexOf(beforeId);
+    nextTargetIds.splice(insertIndex, 0, projectId);
+
+    await connection.query(
+      'UPDATE projects SET parent_id = ? WHERE id = ? AND user_id = ?',
+      [parentId, projectId, userId]
+    );
+
+    if (sourceParentId !== parentId) {
+      await updateSiblingOrder(sourceParentId, sourceIds.filter((id) => id !== projectId));
+    }
+    await updateSiblingOrder(parentId, nextTargetIds);
+
+    await connection.commit();
+    return { status: 'updated' };
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+};
+
 exports.reorder = async ({ userId, parentId = null, orderedIds }) => {
   const connection = await db.getConnection();
 

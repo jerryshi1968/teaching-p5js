@@ -132,10 +132,11 @@ exports.updateGroup = async (req, res, next) => {
   }
 };
 
-exports.moveGroup = async (req, res, next) => {
+const repositionGroup = async (req, res, next) => {
   try {
     const groupId = Number.parseInt(req.params.id, 10);
     const parentId = normalizeParentId(req.body.parentId);
+    const beforeId = normalizeParentId(req.body.beforeId);
 
     if (!Number.isFinite(groupId) || groupId <= 0) {
       return res.status(400).json({ message: '作品组 ID 不正确。' });
@@ -145,9 +146,18 @@ exports.moveGroup = async (req, res, next) => {
       return res.status(400).json({ message: '目标作品组 ID 不正确。' });
     }
 
+    if (Number.isNaN(beforeId)) {
+      return res.status(400).json({ message: '排序目标作品组 ID 不正确。' });
+    }
+
     const group = await ProjectGroup.findOwnedById({ id: groupId, userId: req.user.id });
     if (!group) {
       return res.status(404).json({ message: '作品组不存在或无权访问。' });
+    }
+
+    const sourceParentId = group.parent_id === null ? null : Number(group.parent_id);
+    if (!Object.prototype.hasOwnProperty.call(req.body, 'beforeId') && sourceParentId === parentId) {
+      return res.json({ message: '作品组已移动。' });
     }
 
     if (parentId === groupId) {
@@ -170,9 +180,26 @@ exports.moveGroup = async (req, res, next) => {
       }
     }
 
-    const affectedRows = await ProjectGroup.move({ id: groupId, userId: req.user.id, parentId });
-    if (affectedRows === 0) {
+    const result = await ProjectGroup.reposition({
+      id: groupId,
+      userId: req.user.id,
+      parentId,
+      beforeId
+    });
+    if (result.status === 'not_found') {
       return res.status(404).json({ message: '作品组不存在或无权访问。' });
+    }
+
+    if (result.status === 'invalid_parent') {
+      return res.status(404).json({ message: '目标作品组不存在或无权访问。' });
+    }
+
+    if (result.status === 'descendant') {
+      return res.status(400).json({ message: '不能把作品组移动到自己的子作品组中。' });
+    }
+
+    if (result.status === 'invalid_before') {
+      return res.status(400).json({ message: '排序目标不在目标作品组中。' });
     }
 
     res.json({ message: '作品组已移动。' });
@@ -180,6 +207,9 @@ exports.moveGroup = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.moveGroup = repositionGroup;
+exports.repositionGroup = repositionGroup;
 
 exports.reorderGroups = async (req, res, next) => {
   try {

@@ -346,18 +346,30 @@ exports.updateProject = async (req, res, next) => {
   }
 };
 
-exports.moveProject = async (req, res, next) => {
+const repositionProject = async (req, res, next) => {
   try {
     const projectId = req.params.id;
     const parentId = normalizeParentId(req.body.parentId);
+    const beforeId = req.body.beforeId === undefined || req.body.beforeId === null || req.body.beforeId === ''
+      ? null
+      : String(req.body.beforeId);
 
     if (Number.isNaN(parentId)) {
       return res.status(400).json({ message: '目标作品组 ID 不正确。' });
     }
 
+    if (beforeId !== null && !beforeId.trim()) {
+      return res.status(400).json({ message: '排序目标项目 ID 不正确。' });
+    }
+
     const project = await Project.findOwnedById(projectId, req.user.id);
     if (!project) {
       return res.status(404).json({ message: '项目不存在或无权限。' });
+    }
+
+    const sourceParentId = project.parent_id === null ? null : Number(project.parent_id);
+    if (!Object.prototype.hasOwnProperty.call(req.body, 'beforeId') && sourceParentId === parentId) {
+      return res.json({ message: '项目已移动。' });
     }
 
     if (parentId !== null) {
@@ -367,13 +379,22 @@ exports.moveProject = async (req, res, next) => {
       }
     }
 
-    const affectedRows = await Project.move({
+    const result = await Project.reposition({
       projectId,
       userId: req.user.id,
-      parentId
+      parentId,
+      beforeId
     });
-    if (affectedRows === 0) {
+    if (result.status === 'not_found') {
       return res.status(404).json({ message: '项目不存在或无权限。' });
+    }
+
+    if (result.status === 'invalid_parent') {
+      return res.status(404).json({ message: '目标作品组不存在或无权访问。' });
+    }
+
+    if (result.status === 'invalid_before') {
+      return res.status(400).json({ message: '排序目标不在目标作品组中。' });
     }
 
     res.json({ message: '项目已移动。' });
@@ -381,6 +402,9 @@ exports.moveProject = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.moveProject = repositionProject;
+exports.repositionProject = repositionProject;
 
 exports.reorderProjects = async (req, res, next) => {
   try {

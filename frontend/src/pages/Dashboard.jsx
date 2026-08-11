@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Folder, MoveRight, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy, ShieldCheck, Send } from 'lucide-react';
+import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, pointerWithin, rectIntersection, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { ArrowDown, ArrowUp, Folder, GripVertical, MoveRight, Plus, Trash2, Calendar, User, LogOut, Smile, Sparkles, Star, Palette, Pencil, Copy, ShieldCheck, Send } from 'lucide-react';
 // 导入网络请求工具
-import { fetchMyProjects, copyProject, distributeProjectToClass, fetchMyClasses, fetchStudentsByClass, fetchProjectGroups, fetchAllProjectGroups, createProjectGroup, updateProjectGroup, moveProjectGroup, reorderProjectGroups, deleteProjectGroup, moveProject, reorderProjects } from '../services/api';
+import { fetchMyProjects, copyProject, distributeProjectToClass, fetchMyClasses, fetchStudentsByClass, fetchProjectGroups, fetchAllProjectGroups, createProjectGroup, updateProjectGroup, moveProjectGroup, repositionProjectGroup, deleteProjectGroup, moveProject, repositionProject } from '../services/api';
 import { useAppDialog } from '../hooks/useAppDialog';
 import ProfileDialog from '../components/Common/ProfileDialog';
 import LanguageSelect from '../components/Common/LanguageSelect';
@@ -13,6 +16,101 @@ const DASHBOARD_SELECTED_STUDENT_KEY = 'teaching_dashboard_selected_student_id';
 const DASHBOARD_CURRENT_GROUP_KEY = 'teaching_dashboard_current_group_id';
 
 const canUseTeacherFeatures = (user) => user?.role === 'teacher' || user?.role === 'admin';
+
+const buildSortableId = (type, id) => `sort-${type}:${id}`;
+const buildGroupDropId = (id) => `into-group:${id}`;
+const buildParentDropId = (id) => `into-parent:${id === null ? 'root' : id}`;
+
+const parseDragId = (dragId) => {
+  const value = String(dragId);
+  const separatorIndex = value.indexOf(':');
+  if (separatorIndex < 0) return { type: '', id: '' };
+  return {
+    type: value.slice(0, separatorIndex),
+    id: value.slice(separatorIndex + 1)
+  };
+};
+
+const dashboardCollisionDetection = (args) => {
+  if (!args.pointerCoordinates) {
+    const closestCollisions = closestCenter(args);
+    const activeType = parseDragId(args.active.id).type;
+    const sortableCollision = closestCollisions.find((collision) => parseDragId(collision.id).type === activeType);
+    return sortableCollision ? [sortableCollision] : closestCollisions;
+  }
+
+  const pointerCollisions = pointerWithin(args);
+  const moveCollision = pointerCollisions.find((collision) => String(collision.id).startsWith('into-'));
+  if (moveCollision) return [moveCollision];
+  if (pointerCollisions.length > 0) return pointerCollisions;
+
+  const intersectingCollisions = rectIntersection(args);
+  if (intersectingCollisions.length > 0) return intersectingCollisions;
+  return closestCenter(args);
+};
+
+const SortableCard = ({ id, disabled, className, onClick, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={onClick}
+      className={`${className} ${isDragging ? 'opacity-30' : ''}`}
+    >
+      {children({
+        dragHandleProps: {
+          ...attributes,
+          ...listeners
+        },
+        isDragging
+      })}
+    </div>
+  );
+};
+
+const GroupIntoDropZone = ({ groupId, enabled }) => {
+  const { isOver, setNodeRef } = useDroppable({
+    id: buildGroupDropId(groupId),
+    disabled: !enabled
+  });
+
+  if (!enabled) return null;
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`pointer-events-none absolute inset-7 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed bg-emerald-50/95 text-xs font-black text-emerald-700 transition-all ${
+        isOver ? 'scale-105 border-emerald-500 shadow-lg' : 'border-emerald-300 opacity-80'
+      }`}
+    >
+      放入此作品组
+    </div>
+  );
+};
+
+const ParentDropButton = ({ parentId, enabled, onClick, className, children }) => {
+  const { isOver, setNodeRef } = useDroppable({
+    id: buildParentDropId(parentId),
+    disabled: !enabled
+  });
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      onClick={onClick}
+      className={`${className} ${isOver ? 'scale-105 bg-emerald-100 text-emerald-700 ring-4 ring-emerald-200' : ''}`}
+    >
+      {children}
+    </button>
+  );
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -26,16 +124,30 @@ const Dashboard = () => {
     const stateGroupId = location.state?.dashboardGroupId;
     if (stateGroupId !== undefined) return stateGroupId;
 
-    const savedGroupId = sessionStorage.getItem(DASHBOARD_CURRENT_GROUP_KEY);
-    return savedGroupId ? Number(savedGroupId) : null;
+    const savedGroupId = localStorage.getItem(DASHBOARD_CURRENT_GROUP_KEY) || sessionStorage.getItem(DASHBOARD_CURRENT_GROUP_KEY);
+    const parsedGroupId = savedGroupId ? Number(savedGroupId) : null;
+    return Number.isFinite(parsedGroupId) && parsedGroupId > 0 ? parsedGroupId : null;
   });
   const [allProjectGroups, setAllProjectGroups] = useState([]);
   const [moveDialog, setMoveDialog] = useState(null);
   const [moveTargetId, setMoveTargetId] = useState('');
   const [moveSaving, setMoveSaving] = useState(false);
+  const [activeDrag, setActiveDrag] = useState(null);
+  const [dragSaving, setDragSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const dragSensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: { distance: 6 }
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 220, tolerance: 8 }
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates
+    })
+  );
 
   // === 教师模式新增状态 ===
   const [teacherClasses, setTeacherClasses] = useState([]); // 存放教师绑定的班级列表
@@ -145,11 +257,24 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (currentGroupId === null || currentGroupId === undefined) {
+      localStorage.removeItem(DASHBOARD_CURRENT_GROUP_KEY);
       sessionStorage.removeItem(DASHBOARD_CURRENT_GROUP_KEY);
     } else {
-      sessionStorage.setItem(DASHBOARD_CURRENT_GROUP_KEY, String(currentGroupId));
+      localStorage.setItem(DASHBOARD_CURRENT_GROUP_KEY, String(currentGroupId));
+      sessionStorage.removeItem(DASHBOARD_CURRENT_GROUP_KEY);
     }
   }, [currentGroupId]);
+
+  useEffect(() => {
+    if (location.state?.dashboardGroupId === undefined) return;
+
+    const nextState = { ...location.state };
+    delete nextState.dashboardGroupId;
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(nextState).length > 0 ? nextState : null
+    });
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     if (!currentUser || !canUseTeacherFeatures(currentUser)) return;
@@ -399,9 +524,9 @@ const Dashboard = () => {
     setProjectGroups(nextGroups);
 
     try {
-      await reorderProjectGroups({
+      await repositionProjectGroup(nextGroups[targetIndex].id, {
         parentId: currentGroupId,
-        orderedIds: nextGroups.map((group) => group.id)
+        beforeId: nextGroups[targetIndex + 1]?.id ?? null
       });
     } catch (err) {
       setProjectGroups(projectGroups);
@@ -422,9 +547,9 @@ const Dashboard = () => {
     setProjects(nextProjects);
 
     try {
-      await reorderProjects({
+      await repositionProject(nextProjects[targetIndex].id, {
         parentId: currentGroupId,
-        orderedIds: nextProjects.map((project) => project.id)
+        beforeId: nextProjects[targetIndex + 1]?.id ?? null
       });
     } catch (err) {
       setProjects(projects);
@@ -432,6 +557,137 @@ const Dashboard = () => {
         title: '排序失败',
         message: err.message
       });
+    }
+  };
+
+  const handleDragStart = ({ active }) => {
+    if (selectedStudentId !== 'me' || dragSaving) return;
+
+    const parsed = parseDragId(active.id);
+    if (parsed.type === 'sort-group') {
+      const group = projectGroups.find((item) => String(item.id) === parsed.id);
+      if (group) setActiveDrag({ type: 'group', id: group.id, name: group.name });
+      return;
+    }
+
+    if (parsed.type === 'sort-project') {
+      const project = projects.find((item) => String(item.id) === parsed.id);
+      if (project) setActiveDrag({ type: 'project', id: project.id, name: project.name });
+    }
+  };
+
+  const handleDragCancel = () => {
+    setActiveDrag(null);
+  };
+
+  const handleDropIntoParent = async (type, itemId, parentId) => {
+    const originalItems = type === 'group' ? projectGroups : projects;
+
+    if (type === 'group') {
+      setProjectGroups(originalItems.filter((item) => String(item.id) !== String(itemId)));
+    } else {
+      setProjects(originalItems.filter((item) => String(item.id) !== String(itemId)));
+    }
+
+    try {
+      setDragSaving(true);
+      if (type === 'group') {
+        await repositionProjectGroup(itemId, { parentId, beforeId: null });
+      } else {
+        await repositionProject(itemId, { parentId, beforeId: null });
+      }
+    } catch (err) {
+      if (type === 'group') {
+        setProjectGroups(originalItems);
+      } else {
+        setProjects(originalItems);
+      }
+      await appDialog.alert({
+        title: '拖放失败',
+        message: err.message
+      });
+    } finally {
+      setDragSaving(false);
+    }
+  };
+
+  const handleDropReorder = async (type, itemId, overItemId) => {
+    const originalItems = type === 'group' ? projectGroups : projects;
+    const oldIndex = originalItems.findIndex((item) => String(item.id) === String(itemId));
+    const newIndex = originalItems.findIndex((item) => String(item.id) === String(overItemId));
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+
+    const nextItems = arrayMove(originalItems, oldIndex, newIndex);
+    const beforeId = nextItems[newIndex + 1]?.id ?? null;
+
+    if (type === 'group') {
+      setProjectGroups(nextItems);
+    } else {
+      setProjects(nextItems);
+    }
+
+    try {
+      setDragSaving(true);
+      if (type === 'group') {
+        await repositionProjectGroup(itemId, { parentId: currentGroupId, beforeId });
+      } else {
+        await repositionProject(itemId, { parentId: currentGroupId, beforeId });
+      }
+    } catch (err) {
+      if (type === 'group') {
+        setProjectGroups(originalItems);
+      } else {
+        setProjects(originalItems);
+      }
+      await appDialog.alert({
+        title: '排序失败',
+        message: err.message
+      });
+    } finally {
+      setDragSaving(false);
+    }
+  };
+
+  const handleDragEnd = async ({ active, over }) => {
+    setActiveDrag(null);
+    if (!over || selectedStudentId !== 'me' || dragSaving) return;
+
+    const activeItem = parseDragId(active.id);
+    const overItem = parseDragId(over.id);
+    const type = activeItem.type === 'sort-group'
+      ? 'group'
+      : activeItem.type === 'sort-project'
+        ? 'project'
+        : null;
+    if (!type) return;
+
+    if (overItem.type === 'into-parent') {
+      const parentId = overItem.id === 'root' ? null : Number(overItem.id);
+      const isCurrentParent = parentId === null
+        ? currentGroupId === null
+        : Number(parentId) === Number(currentGroupId);
+      if (!isCurrentParent) await handleDropIntoParent(type, activeItem.id, parentId);
+      return;
+    }
+
+    if (overItem.type === 'into-group') {
+      if (type === 'group' && String(activeItem.id) === String(overItem.id)) return;
+      await handleDropIntoParent(type, activeItem.id, Number(overItem.id));
+      return;
+    }
+
+    if (type === 'project' && overItem.type === 'sort-group') {
+      await handleDropIntoParent(type, activeItem.id, Number(overItem.id));
+      return;
+    }
+
+    if (type === 'group' && overItem.type === 'sort-group') {
+      await handleDropReorder(type, activeItem.id, overItem.id);
+      return;
+    }
+
+    if (type === 'project' && overItem.type === 'sort-project') {
+      await handleDropReorder(type, activeItem.id, overItem.id);
     }
   };
 
@@ -587,6 +843,8 @@ const Dashboard = () => {
       localStorage.removeItem('teaching_user');
       localStorage.removeItem(DASHBOARD_SELECTED_CLASS_KEY);
       localStorage.removeItem(DASHBOARD_SELECTED_STUDENT_KEY);
+      localStorage.removeItem(DASHBOARD_CURRENT_GROUP_KEY);
+      sessionStorage.removeItem(DASHBOARD_CURRENT_GROUP_KEY);
       navigate('/login');
     }
   };
@@ -823,9 +1081,17 @@ const Dashboard = () => {
           )}
         </div>
 
+        <DndContext
+          sensors={dragSensors}
+          collisionDetection={dashboardCollisionDetection}
+          onDragStart={handleDragStart}
+          onDragCancel={handleDragCancel}
+          onDragEnd={handleDragEnd}
+        >
         <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-black text-slate-500">
-          <button
-            type="button"
+          <ParentDropButton
+            parentId={null}
+            enabled={Boolean(activeDrag) && currentGroupId !== null && !dragSaving}
             onClick={() => setCurrentGroupId(null)}
             className={`rounded-full px-3 py-1.5 transition ${
               currentGroupId === null
@@ -834,12 +1100,13 @@ const Dashboard = () => {
             }`}
           >
             根作品组
-          </button>
+          </ParentDropButton>
           {breadcrumbs.map((group) => (
             <React.Fragment key={group.id}>
               <span className="text-slate-300">/</span>
-              <button
-                type="button"
+              <ParentDropButton
+                parentId={group.id}
+                enabled={Boolean(activeDrag) && Number(currentGroupId) !== Number(group.id) && !dragSaving}
                 onClick={() => setCurrentGroupId(group.id)}
                 className={`rounded-full px-3 py-1.5 transition ${
                   Number(currentGroupId) === Number(group.id)
@@ -848,7 +1115,7 @@ const Dashboard = () => {
                 }`}
               >
                 <span data-i18n-skip>{group.name}</span>
-              </button>
+              </ParentDropButton>
             </React.Fragment>
           ))}
         </div>
@@ -882,12 +1149,24 @@ const Dashboard = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <SortableContext
+              items={projectGroups.map((group) => buildSortableId('group', group.id))}
+              strategy={rectSortingStrategy}
+            >
             {projectGroups.map((group, index) => (
-              <div
+              <SortableCard
                 key={`group-${group.id}`}
+                id={buildSortableId('group', group.id)}
+                disabled={selectedStudentId !== 'me' || dragSaving}
                 onClick={() => setCurrentGroupId(group.id)}
                 className="bg-white border-4 border-indigo-200 bg-indigo-50/40 hover:-translate-y-1.5 rounded-[2rem] p-5 cursor-pointer transition-all duration-300 flex flex-col justify-between group h-44 shadow-sm hover:shadow-[0_12px_24px_rgba(0,0,0,0.06)] relative overflow-hidden"
               >
+                {({ dragHandleProps }) => (
+                <>
+                <GroupIntoDropZone
+                  groupId={group.id}
+                  enabled={Boolean(activeDrag) && !(activeDrag.type === 'group' && String(activeDrag.id) === String(group.id))}
+                />
                 <div className="absolute top-0 right-0 w-14 h-14 pointer-events-none opacity-20">
                   <Folder className="w-full h-full text-indigo-400 fill-current translate-x-3 -translate-y-3" />
                 </div>
@@ -900,6 +1179,17 @@ const Dashboard = () => {
 
                     {selectedStudentId === 'me' && (
                       <div className="flex items-center justify-end space-x-1">
+                        <button
+                          {...dragHandleProps}
+                          onClick={(e) => e.stopPropagation()}
+                          disabled={dragSaving}
+                          style={{ touchAction: 'none' }}
+                          className="cursor-grab text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 p-1.5 rounded-xl transition duration-150 active:cursor-grabbing disabled:opacity-30"
+                          title="拖放作品组"
+                          aria-label="拖放作品组"
+                        >
+                          <GripVertical className="w-4.5 h-4.5" />
+                        </button>
                         <button
                           onClick={(e) => handleReorderGroup(e, index, -1)}
                           disabled={index === 0}
@@ -949,17 +1239,28 @@ const Dashboard = () => {
                     文件夹
                   </span>
                 </div>
-              </div>
+                </>
+                )}
+              </SortableCard>
             ))}
+            </SortableContext>
+            <SortableContext
+              items={projects.map((project) => buildSortableId('project', project.id))}
+              strategy={rectSortingStrategy}
+            >
             {projects.map((project, index) => {
               // 为当前卡片挑选一套专属的主题样式
               const style = cardStyles[index % cardStyles.length];
               return (
-                <div
+                <SortableCard
                   key={project.id}
+                  id={buildSortableId('project', project.id)}
+                  disabled={selectedStudentId !== 'me' || dragSaving}
                   onClick={() => navigate(`/editor/${project.id}`, { state: { dashboardGroupId: currentGroupId } })}
                   className={`bg-white border-4 ${style.border} ${style.bg} hover:-translate-y-1.5 rounded-[2rem] p-5 cursor-pointer transition-all duration-300 flex flex-col justify-between group h-44 shadow-sm hover:shadow-[0_12px_24px_rgba(0,0,0,0.06)] relative overflow-hidden`}
                 >
+                  {({ dragHandleProps }) => (
+                  <>
                   {/* 右上角斜挎装饰，像一个小书签 */}
                   <div className={`absolute top-0 right-0 w-12 h-12 pointer-events-none opacity-20`}>
                     <Star className="w-full h-full text-slate-400 fill-current translate-x-3 -translate-y-3" />
@@ -986,6 +1287,17 @@ const Dashboard = () => {
                       {/* 操作按钮区（仅在看自己的项目时显示，防止老师误修改或误删学生作品） */}
                       {selectedStudentId === 'me' && (
                         <div className="flex items-center justify-end space-x-1">
+                          <button
+                            {...dragHandleProps}
+                            onClick={(e) => e.stopPropagation()}
+                            disabled={dragSaving}
+                            style={{ touchAction: 'none' }}
+                            className="cursor-grab text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 p-1.5 rounded-xl transition duration-150 active:cursor-grabbing disabled:opacity-30"
+                            title="拖放作品"
+                            aria-label="拖放作品"
+                          >
+                            <GripVertical className="w-4.5 h-4.5" />
+                          </button>
                           {canUseTeacherFeatures(currentUser) && (
                             <button
                               onClick={(e) => handleDistributeProject(e, project)}
@@ -1052,11 +1364,22 @@ const Dashboard = () => {
                       p5.js 魔法箱
                     </span>
                   </div>
-                </div>
+                  </>
+                  )}
+                </SortableCard>
               );
             })}
+            </SortableContext>
           </div>
         )}
+        <DragOverlay>
+          {activeDrag ? (
+            <div className="max-w-72 rounded-2xl border-4 border-indigo-300 bg-white px-5 py-3 text-sm font-black text-indigo-700 shadow-2xl">
+              {activeDrag.type === 'group' ? '📁' : '✨'} <span data-i18n-skip>{activeDrag.name}</span>
+            </div>
+          ) : null}
+        </DragOverlay>
+        </DndContext>
       </main>
     </div>
     </>
