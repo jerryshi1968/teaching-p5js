@@ -113,6 +113,7 @@ const EditorView = () => {
   const iframeRef = useRef(null);
   const exampleMenuRef = useRef(null);
   const dashboardGroupId = location.state?.dashboardGroupId ?? null;
+  const isVerticalLayout = new URLSearchParams(location.search).get('vertical') === '1';
 
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -930,8 +931,8 @@ const EditorView = () => {
           onAiCancel={handleAiCancel}
         />
 
-        <Split className="flex-1 flex" sizes={[55, 45]} minSize={250} gutterSize={8} direction="horizontal">
-          <div className="h-full bg-[#1e1e1e] rounded-l-2xl overflow-hidden border-2 border-transparent">
+        <Split className={`flex-1 flex ${isVerticalLayout ? 'flex-col-reverse min-w-0 min-h-0' : ''}`} sizes={[55, 45]} minSize={250} gutterSize={8} direction={isVerticalLayout ? 'vertical' : 'horizontal'}>
+          <div className={`h-full bg-[#1e1e1e] overflow-hidden border-2 border-transparent ${isVerticalLayout ? 'rounded-b-2xl' : 'rounded-l-2xl'}`}>
             {isEditableTextFile(activeFile) ? (
               <CodeEditor
                 fileName={activeFile.path}
@@ -952,7 +953,7 @@ const EditorView = () => {
             )}
           </div>
 
-          <div className="h-full bg-white flex flex-col border-l-4 border-slate-100">
+          <div className={`h-full bg-white flex flex-col ${isVerticalLayout ? 'border-b-4' : 'border-l-4'} border-slate-100`}>
             <div className="px-4 py-2.5 bg-slate-100 text-xs text-slate-500 font-black border-b-2 border-slate-200 select-none flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-yellow-500" />
