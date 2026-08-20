@@ -114,6 +114,7 @@ const EditorView = () => {
   const exampleMenuRef = useRef(null);
   const dashboardGroupId = location.state?.dashboardGroupId ?? null;
   const isVerticalLayout = new URLSearchParams(location.search).get('vertical') === '1';
+  const isAutoRunEnabled = new URLSearchParams(location.search).get('autorun') !== '0';
 
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -234,10 +235,10 @@ const EditorView = () => {
   }, [projectId]);
 
   useEffect(() => {
-    if (!loading && files.length > 0) {
+    if (isAutoRunEnabled && !loading && files.length > 0) {
       handleRun();
     }
-  }, [loading]);
+  }, [loading, isAutoRunEnabled]);
 
   useEffect(() => {
     if (!exampleMenuOpen) return undefined;
