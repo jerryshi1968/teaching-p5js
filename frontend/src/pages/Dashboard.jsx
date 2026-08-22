@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, pointerWithin, rectIntersection, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
@@ -14,8 +14,60 @@ import { useLanguage } from '../i18n/LanguageContext';
 const DASHBOARD_SELECTED_CLASS_KEY = 'teaching_dashboard_selected_class_code';
 const DASHBOARD_SELECTED_STUDENT_KEY = 'teaching_dashboard_selected_student_id';
 const DASHBOARD_CURRENT_GROUP_KEY = 'teaching_dashboard_current_group_id';
+const DASHBOARD_CURRENT_GROUP_PATHS_KEY_PREFIX = 'teaching_dashboard_current_group_paths_v2';
 
 const canUseTeacherFeatures = (user) => user?.role === 'teacher' || user?.role === 'admin';
+
+const normalizeDashboardGroupId = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const groupId = Number(value);
+  return Number.isFinite(groupId) && groupId > 0 ? groupId : null;
+};
+
+const getDashboardGroupOwnerKey = (studentId) => studentId === 'me' ? 'me' : `student:${studentId}`;
+const getDashboardGroupPathsStorageKey = (userId) => `${DASHBOARD_CURRENT_GROUP_PATHS_KEY_PREFIX}:${userId}`;
+
+const getStoredDashboardUserId = () => {
+  try {
+    return JSON.parse(localStorage.getItem('teaching_user') || 'null')?.id || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const readSavedDashboardGroupId = (userId, studentId) => {
+  if (!userId) return undefined;
+
+  try {
+    const savedPaths = JSON.parse(localStorage.getItem(getDashboardGroupPathsStorageKey(userId)) || '{}');
+    const ownerKey = getDashboardGroupOwnerKey(studentId);
+    if (!savedPaths || typeof savedPaths !== 'object' || Array.isArray(savedPaths) || !Object.prototype.hasOwnProperty.call(savedPaths, ownerKey)) {
+      return undefined;
+    }
+    return normalizeDashboardGroupId(savedPaths[ownerKey]);
+  } catch (e) {
+    console.error('解析作品组路径失败', e);
+    return undefined;
+  }
+};
+
+const saveDashboardGroupId = (userId, studentId, groupId) => {
+  if (!userId) return;
+
+  const storageKey = getDashboardGroupPathsStorageKey(userId);
+  let savedPaths = {};
+  try {
+    const parsedPaths = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    if (parsedPaths && typeof parsedPaths === 'object' && !Array.isArray(parsedPaths)) {
+      savedPaths = parsedPaths;
+    }
+  } catch (e) {
+    console.error('解析作品组路径失败', e);
+  }
+
+  savedPaths[getDashboardGroupOwnerKey(studentId)] = normalizeDashboardGroupId(groupId);
+  localStorage.setItem(storageKey, JSON.stringify(savedPaths));
+};
 
 const buildSortableId = (type, id) => `sort-${type}:${id}`;
 const buildGroupDropId = (id) => `into-group:${id}`;
@@ -122,11 +174,14 @@ const Dashboard = () => {
   const [breadcrumbs, setBreadcrumbs] = useState([]);
   const [currentGroupId, setCurrentGroupId] = useState(() => {
     const stateGroupId = location.state?.dashboardGroupId;
-    if (stateGroupId !== undefined) return stateGroupId;
+    if (stateGroupId !== undefined) return normalizeDashboardGroupId(stateGroupId);
 
-    const savedGroupId = localStorage.getItem(DASHBOARD_CURRENT_GROUP_KEY) || sessionStorage.getItem(DASHBOARD_CURRENT_GROUP_KEY);
-    const parsedGroupId = savedGroupId ? Number(savedGroupId) : null;
-    return Number.isFinite(parsedGroupId) && parsedGroupId > 0 ? parsedGroupId : null;
+    const savedStudentId = localStorage.getItem(DASHBOARD_SELECTED_STUDENT_KEY) || 'me';
+    const savedGroupId = readSavedDashboardGroupId(getStoredDashboardUserId(), savedStudentId);
+    if (savedGroupId !== undefined) return savedGroupId;
+
+    const legacyGroupId = localStorage.getItem(DASHBOARD_CURRENT_GROUP_KEY) || sessionStorage.getItem(DASHBOARD_CURRENT_GROUP_KEY);
+    return normalizeDashboardGroupId(legacyGroupId);
   });
   const [allProjectGroups, setAllProjectGroups] = useState([]);
   const [moveDialog, setMoveDialog] = useState(null);
@@ -137,6 +192,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const projectLoadRequestIdRef = useRef(0);
   const dragSensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: { distance: 6 }
@@ -197,21 +253,33 @@ const Dashboard = () => {
     return names.join(' / ');
   };
   const refreshCurrentDirectory = async () => {
+    const requestId = ++projectLoadRequestIdRef.current;
     const targetStudentId = getTargetStudentId();
     const [projectData, groupData] = await Promise.all([
       fetchMyProjects(targetStudentId, currentGroupId),
       fetchProjectGroups({ studentId: targetStudentId, parentId: currentGroupId })
     ]);
 
+    if (requestId !== projectLoadRequestIdRef.current) return;
     if (projectData) setProjects(projectData);
     if (groupData) {
       setProjectGroups(Array.isArray(groupData.groups) ? groupData.groups : []);
       setBreadcrumbs(Array.isArray(groupData.breadcrumbs) ? groupData.breadcrumbs : []);
     }
   };
-  const handleStudentChange = (studentId) => {
-    setCurrentGroupId(null);
+  const restoreProjectOwner = (studentId) => {
+    const userId = currentUser?.id || getStoredDashboardUserId();
+    const savedGroupId = readSavedDashboardGroupId(userId, studentId);
+    setCurrentGroupId(savedGroupId === undefined ? null : savedGroupId);
     setSelectedStudentId(studentId);
+  };
+  const selectProjectOwner = (studentId) => {
+    const userId = currentUser?.id || getStoredDashboardUserId();
+    saveDashboardGroupId(userId, selectedStudentId, currentGroupId);
+    restoreProjectOwner(studentId);
+  };
+  const handleStudentChange = (studentId) => {
+    selectProjectOwner(studentId);
   };
 
   // 1. 初始化：获取用户信息
@@ -244,7 +312,7 @@ const Dashboard = () => {
           } else {
             localStorage.removeItem(DASHBOARD_SELECTED_CLASS_KEY);
             localStorage.setItem(DASHBOARD_SELECTED_STUDENT_KEY, 'me');
-            setSelectedStudentId('me');
+            if (selectedStudentId !== 'me') restoreProjectOwner('me');
           }
         })
         .catch(err => console.error('拉取班级列表失败', err));
@@ -256,14 +324,12 @@ const Dashboard = () => {
   }, [selectedStudentId]);
 
   useEffect(() => {
-    if (currentGroupId === null || currentGroupId === undefined) {
-      localStorage.removeItem(DASHBOARD_CURRENT_GROUP_KEY);
-      sessionStorage.removeItem(DASHBOARD_CURRENT_GROUP_KEY);
-    } else {
-      localStorage.setItem(DASHBOARD_CURRENT_GROUP_KEY, String(currentGroupId));
-      sessionStorage.removeItem(DASHBOARD_CURRENT_GROUP_KEY);
-    }
-  }, [currentGroupId]);
+    if (!currentUser?.id) return;
+
+    saveDashboardGroupId(currentUser.id, selectedStudentId, currentGroupId);
+    localStorage.removeItem(DASHBOARD_CURRENT_GROUP_KEY);
+    sessionStorage.removeItem(DASHBOARD_CURRENT_GROUP_KEY);
+  }, [currentGroupId, currentUser, selectedStudentId]);
 
   useEffect(() => {
     if (location.state?.dashboardGroupId === undefined) return;
@@ -282,7 +348,7 @@ const Dashboard = () => {
     if (!selectedClassCode) {
       setStudents([]);
       setStudentsLoaded(true);
-      setSelectedStudentId('me');
+      if (selectedStudentId !== 'me') restoreProjectOwner('me');
       return;
     }
 
@@ -296,21 +362,20 @@ const Dashboard = () => {
           ? savedStudentId
           : 'me';
         setStudents(nextStudents);
-        setSelectedStudentId(nextStudentId);
+        if (String(nextStudentId) !== String(selectedStudentId)) restoreProjectOwner(nextStudentId);
         setStudentsLoaded(true);
       })
       .catch(err => {
         console.error('拉取班级学生列表失败', err);
         setStudents([]);
-        setSelectedStudentId('me');
+        if (selectedStudentId !== 'me') restoreProjectOwner('me');
         setStudentsLoaded(true);
       });
   }, [currentUser, selectedClassCode]);
 
   const handleClassChange = (classCode) => {
-    setCurrentGroupId(null);
     setSelectedClassCode(classCode);
-    setSelectedStudentId('me');
+    selectProjectOwner('me');
     localStorage.setItem(DASHBOARD_SELECTED_STUDENT_KEY, 'me');
     if (classCode) {
       localStorage.setItem(DASHBOARD_SELECTED_CLASS_KEY, classCode);
@@ -321,14 +386,16 @@ const Dashboard = () => {
 
   // 2. 监听选中学生的变化，动态拉取作品列表
   useEffect(() => {
-    if (!currentUser) return;
+    const requestId = ++projectLoadRequestIdRef.current;
+    let cancelled = false;
+    if (!currentUser) return () => { cancelled = true; };
 
     if (!canUseTeacherFeatures(currentUser) && selectedStudentId !== 'me') {
-      setSelectedStudentId('me');
-      return;
+      restoreProjectOwner('me');
+      return () => { cancelled = true; };
     }
 
-    if (canUseTeacherFeatures(currentUser) && selectedStudentId !== 'me' && !studentsLoaded) return;
+    if (canUseTeacherFeatures(currentUser) && selectedStudentId !== 'me' && !studentsLoaded) return () => { cancelled = true; };
 
     setLoading(true);
     // 如果选中的是 'me'，传入 null（拉取自己的项目）；否则传入具体的学生 ID
@@ -339,6 +406,7 @@ const Dashboard = () => {
       fetchProjectGroups({ studentId: targetStudentId, parentId: currentGroupId })
     ])
       .then(([projectData, groupData]) => {
+        if (cancelled || requestId !== projectLoadRequestIdRef.current) return;
         if (projectData) setProjects(projectData);
         if (groupData) {
           setProjectGroups(Array.isArray(groupData.groups) ? groupData.groups : []);
@@ -347,11 +415,18 @@ const Dashboard = () => {
         setLoading(false);
       })
       .catch(err => {
+        if (cancelled || requestId !== projectLoadRequestIdRef.current) return;
+        if (err?.status === 404 && currentGroupId !== null) {
+          setCurrentGroupId(null);
+          return;
+        }
         console.error('拉取项目列表失败', err);
         setProjectGroups([]);
         setBreadcrumbs([]);
         setLoading(false);
       });
+
+    return () => { cancelled = true; };
   }, [selectedStudentId, currentUser, studentsLoaded, currentGroupId]);
 
   // 3. 创建新项目逻辑

@@ -59,7 +59,11 @@ export const fetchProjectGroups = async ({ studentId = null, parentId = null } =
     window.location.href = `${import.meta.env.BASE_URL}login`;
     return null;
   }
-  if (!response.ok) throw new Error(data?.message || `获取作品组失败（HTTP ${response.status}），请重试。`);
+  if (!response.ok) {
+    const error = new Error(data?.message || `获取作品组失败（HTTP ${response.status}），请重试。`);
+    error.status = response.status;
+    throw error;
+  }
   return data;
 };
 
