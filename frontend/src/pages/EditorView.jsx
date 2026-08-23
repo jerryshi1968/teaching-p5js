@@ -4,6 +4,7 @@ import Split from 'react-split';
 import { BookOpen, ChevronDown, ChevronLeft, ExternalLink, Loader2, Play, Save, Sparkles, Wand2 } from 'lucide-react';
 import CodeEditor from '../components/Workspace/CodeEditor';
 import FileTree from '../components/Workspace/FileTree';
+import ContactTeacherButton from '../components/Common/ContactTeacherButton';
 import { useAppDialog } from '../hooks/useAppDialog';
 import { useLanguage } from '../i18n/LanguageContext';
 import { deleteEditorDraft, deleteProjectDrafts, loadEditorDrafts, saveEditorDraft, saveEmergencyEditorDraft } from '../services/editorDraftStore';
@@ -1255,6 +1256,7 @@ const EditorView = () => {
               </div>
             )}
           </div>
+          <ContactTeacherButton />
         </div>
 
         <div className="flex items-center space-x-3">

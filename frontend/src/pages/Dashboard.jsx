@@ -9,6 +9,7 @@ import { fetchMyProjects, copyProject, distributeProjectToClass, fetchMyClasses,
 import { useAppDialog } from '../hooks/useAppDialog';
 import ProfileDialog from '../components/Common/ProfileDialog';
 import LanguageSelect from '../components/Common/LanguageSelect';
+import ContactTeacherButton from '../components/Common/ContactTeacherButton';
 import { useLanguage } from '../i18n/LanguageContext';
 
 const DASHBOARD_SELECTED_CLASS_KEY = 'teaching_dashboard_selected_class_code';
@@ -1000,6 +1001,7 @@ const Dashboard = () => {
           <span className="text-lg font-black tracking-wide text-slate-800 flex items-center gap-1.5">
             p5.js 创意编程乐园
           </span>
+          <ContactTeacherButton />
         </div>
 
         <div className="flex items-center space-x-6">
