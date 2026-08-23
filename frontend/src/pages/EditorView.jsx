@@ -6,6 +6,7 @@ import CodeEditor from '../components/Workspace/CodeEditor';
 import FileTree from '../components/Workspace/FileTree';
 import { useAppDialog } from '../hooks/useAppDialog';
 import { useLanguage } from '../i18n/LanguageContext';
+import { deleteEditorDraft, deleteProjectDrafts, loadEditorDrafts, saveEditorDraft, saveEmergencyEditorDraft } from '../services/editorDraftStore';
 
 const TEXT_EXTENSIONS = ['.html', '.htm', '.css', '.js', '.txt'];
 const CODE_FONT_SIZE_KEY = 'teaching_editor_code_font_size';
@@ -15,8 +16,11 @@ const AI_IMAGE_MAX_EDGE = 1200;
 const AI_IMAGE_MAX_SIZE = 2 * 1024 * 1024;
 const AI_IMAGE_MAX_COUNT = 3;
 const AI_IMAGE_QUALITIES = [0.82, 0.72, 0.62, 0.52, 0.42];
+const AUTO_SAVE_DELAY = 700;
+const DRAFT_SAVE_DELAY = 250;
 
 const isEditableTextFile = (file) => file && !file.isDirectory && file.isText;
+const getFileKey = (fileId) => String(fileId);
 
 const getParentPath = (file) => {
   if (!file) return '.';
@@ -135,10 +139,22 @@ const EditorView = () => {
   const [examplesError, setExamplesError] = useState('');
   const [exampleMenuOpen, setExampleMenuOpen] = useState(false);
   const [importingExample, setImportingExample] = useState(false);
+  const [dirtyFileIds, setDirtyFileIds] = useState(() => new Set());
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [codeFontSize, setCodeFontSize] = useState(() => {
     const savedSize = localStorage.getItem(CODE_FONT_SIZE_KEY);
     return CODE_FONT_SIZES.includes(savedSize) ? savedSize : 'medium';
   });
+  const filesRef = useRef([]);
+  const dirtyFileIdsRef = useRef(new Set());
+  const fileVersionsRef = useRef(new Map());
+  const saveQueuesRef = useRef(new Map());
+  const draftQueuesRef = useRef(new Map());
+  const draftTimersRef = useRef(new Map());
+  const pendingDraftsRef = useRef(new Map());
+  const activeAutoSaveCountRef = useRef(0);
+  const autoSaveRetryDelayRef = useRef(AUTO_SAVE_DELAY);
 
   const activeFile = useMemo(
     () => files.find((file) => file.id === activeFileId) || null,
@@ -147,6 +163,161 @@ const EditorView = () => {
 
   const token = localStorage.getItem('teaching_token');
 
+  const setDirtyFileKeys = (nextDirtyFileIds) => {
+    dirtyFileIdsRef.current = nextDirtyFileIds;
+    setDirtyFileIds(nextDirtyFileIds);
+  };
+
+  const addDirtyFileKeys = (fileIds) => {
+    const nextDirtyFileIds = new Set(dirtyFileIdsRef.current);
+    fileIds.forEach((fileId) => nextDirtyFileIds.add(getFileKey(fileId)));
+    setDirtyFileKeys(nextDirtyFileIds);
+  };
+
+  const removeDirtyFileKeys = (fileIds) => {
+    const nextDirtyFileIds = new Set(dirtyFileIdsRef.current);
+    fileIds.forEach((fileId) => nextDirtyFileIds.delete(getFileKey(fileId)));
+    setDirtyFileKeys(nextDirtyFileIds);
+  };
+
+  const buildEditorDraft = (file) => ({
+    projectId,
+    fileId: getFileKey(file.id),
+    name: file.name,
+    path: file.path,
+    content: file.content || '',
+    updatedAt: Date.now()
+  });
+
+  const queueDraftOperation = (fileId, operation) => {
+    const fileKey = getFileKey(fileId);
+    const previousOperation = draftQueuesRef.current.get(fileKey) || Promise.resolve();
+    const nextOperation = previousOperation.catch(() => {}).then(operation);
+    draftQueuesRef.current.set(fileKey, nextOperation);
+    void nextOperation.finally(() => {
+      if (draftQueuesRef.current.get(fileKey) === nextOperation) {
+        draftQueuesRef.current.delete(fileKey);
+      }
+    }).catch(() => {});
+    return nextOperation;
+  };
+
+  const flushPendingDraft = (fileId) => {
+    const fileKey = getFileKey(fileId);
+    const timer = draftTimersRef.current.get(fileKey);
+    if (timer) {
+      window.clearTimeout(timer);
+      draftTimersRef.current.delete(fileKey);
+    }
+
+    const draft = pendingDraftsRef.current.get(fileKey);
+    if (!draft) return Promise.resolve();
+
+    pendingDraftsRef.current.delete(fileKey);
+    return queueDraftOperation(fileKey, () => saveEditorDraft(draft));
+  };
+
+  const scheduleFileDraft = (file) => {
+    const fileKey = getFileKey(file.id);
+    const draft = buildEditorDraft(file);
+    saveEmergencyEditorDraft(draft);
+    pendingDraftsRef.current.set(fileKey, draft);
+
+    const previousTimer = draftTimersRef.current.get(fileKey);
+    if (previousTimer) window.clearTimeout(previousTimer);
+    draftTimersRef.current.set(fileKey, window.setTimeout(() => {
+      void flushPendingDraft(fileKey);
+    }, DRAFT_SAVE_DELAY));
+  };
+
+  const deleteStoredDraft = (fileId, expectedVersion) => {
+    const fileKey = getFileKey(fileId);
+    const timer = draftTimersRef.current.get(fileKey);
+    if (timer) window.clearTimeout(timer);
+    draftTimersRef.current.delete(fileKey);
+    pendingDraftsRef.current.delete(fileKey);
+
+    return queueDraftOperation(fileKey, async () => {
+      if (expectedVersion !== undefined && fileVersionsRef.current.get(fileKey) !== expectedVersion) return;
+      await deleteEditorDraft(projectId, fileKey);
+    });
+  };
+
+  const markFileDirty = (file) => {
+    const fileKey = getFileKey(file.id);
+    const nextVersion = (fileVersionsRef.current.get(fileKey) || 0) + 1;
+    fileVersionsRef.current.set(fileKey, nextVersion);
+    addDirtyFileKeys([fileKey]);
+    scheduleFileDraft(file);
+    autoSaveRetryDelayRef.current = AUTO_SAVE_DELAY;
+    setSaveError('');
+    return nextVersion;
+  };
+
+  const discardFileDrafts = async (fileIds) => {
+    const fileKeys = fileIds.map(getFileKey);
+    removeDirtyFileKeys(fileKeys);
+    await Promise.all(fileKeys.map(async (fileKey) => {
+      fileVersionsRef.current.delete(fileKey);
+      await deleteStoredDraft(fileKey);
+    }));
+  };
+
+  const discardAllProjectDrafts = async () => {
+    const fileKeys = new Set([
+      ...filesRef.current.map((file) => getFileKey(file.id)),
+      ...dirtyFileIdsRef.current,
+      ...pendingDraftsRef.current.keys()
+    ]);
+    setDirtyFileKeys(new Set());
+    await Promise.all(Array.from(fileKeys).map(async (fileKey) => {
+      fileVersionsRef.current.delete(fileKey);
+      await deleteStoredDraft(fileKey);
+    }));
+    await deleteProjectDrafts(projectId);
+  };
+
+  const persistDirtyDrafts = () => {
+    dirtyFileIdsRef.current.forEach((fileKey) => {
+      const file = filesRef.current.find((item) => getFileKey(item.id) === fileKey);
+      if (!isEditableTextFile(file)) return;
+
+      const draft = buildEditorDraft(file);
+      saveEmergencyEditorDraft(draft);
+      pendingDraftsRef.current.set(fileKey, draft);
+      void flushPendingDraft(fileKey);
+    });
+  };
+
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (dirtyFileIdsRef.current.size === 0) return;
+      persistDirtyDrafts();
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    const handlePageHide = () => persistDirtyDrafts();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') persistDirtyDrafts();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      persistDirtyDrafts();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
   const handleCodeFontSizeChange = (nextSize) => {
     if (!CODE_FONT_SIZES.includes(nextSize)) return;
 
@@ -154,7 +325,27 @@ const EditorView = () => {
     localStorage.setItem(CODE_FONT_SIZE_KEY, nextSize);
   };
 
-  const handleBackToDashboard = () => {
+  const handleBackToDashboard = async () => {
+    if (dirtyFileIdsRef.current.size > 0) {
+      const dirtyFiles = filesRef.current.filter((file) => dirtyFileIdsRef.current.has(getFileKey(file.id)));
+      setSaving(true);
+      try {
+        await saveFilesToServer(dirtyFiles);
+      } catch (err) {
+        setSaveError(err.message);
+        const shouldLeave = await appDialog.confirm({
+          title: '代码尚未保存到服务器',
+          message: `${err.message}\n\n浏览器草稿已经保留，是否仍然返回工作台？`,
+          confirmText: '保留草稿并返回',
+          cancelText: '继续编辑',
+          tone: 'danger'
+        });
+        if (!shouldLeave) return;
+      } finally {
+        setSaving(false);
+      }
+    }
+
     navigate('/dashboard', { state: { dashboardGroupId } });
   };
 
@@ -181,7 +372,8 @@ const EditorView = () => {
     return data;
   };
 
-  const loadProjectFiles = async () => {
+  const loadProjectFiles = async ({ restoreDrafts = false, preserveDirty = true } = {}) => {
+    const protectedFileIds = preserveDirty ? new Set(dirtyFileIdsRef.current) : new Set();
     const [projectResponse, fileResponse] = await Promise.all([
       fetch(`/api/projects/${projectId}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -199,13 +391,64 @@ const EditorView = () => {
 
     setProjectName(projectData.name);
     setCanEdit(Boolean(projectData.canEdit));
-    setFiles(fileData);
+    let nextFileData = fileData;
 
-    const stillExists = fileData.some((file) => file.id === activeFileId);
+    if (preserveDirty) {
+      dirtyFileIdsRef.current.forEach((fileKey) => protectedFileIds.add(fileKey));
+      const localFilesById = new Map(filesRef.current.map((file) => [getFileKey(file.id), file]));
+      nextFileData = fileData.map((file) => {
+        const fileKey = getFileKey(file.id);
+        const localFile = localFilesById.get(fileKey);
+        return protectedFileIds.has(fileKey) && localFile
+          ? { ...file, content: localFile.content }
+          : file;
+      });
+    }
+
+    if (restoreDrafts && projectData.canEdit) {
+      const savedDrafts = await loadEditorDrafts(projectId);
+      const serverFilesById = new Map(nextFileData.map((file) => [getFileKey(file.id), file]));
+      const recoverableDrafts = savedDrafts.filter((draft) => {
+        const serverFile = serverFilesById.get(getFileKey(draft.fileId));
+        return isEditableTextFile(serverFile) && draft.content !== (serverFile.content || '');
+      });
+      const obsoleteDrafts = savedDrafts.filter((draft) => !recoverableDrafts.includes(draft));
+      await Promise.all(obsoleteDrafts.map((draft) => deleteEditorDraft(projectId, draft.fileId)));
+
+      if (recoverableDrafts.length > 0) {
+        const shouldRestore = await appDialog.confirm({
+          title: '发现未保存的代码',
+          message: `检测到 ${recoverableDrafts.length} 个文件有浏览器草稿，是否恢复？`,
+          highlight: recoverableDrafts.map((draft) => draft.name || draft.path).join('、'),
+          confirmText: '恢复草稿',
+          cancelText: '放弃草稿'
+        });
+
+        if (shouldRestore) {
+          const draftsById = new Map(recoverableDrafts.map((draft) => [getFileKey(draft.fileId), draft]));
+          nextFileData = nextFileData.map((file) => {
+            const draft = draftsById.get(getFileKey(file.id));
+            return draft ? { ...file, content: draft.content } : file;
+          });
+          const restoredFileIds = recoverableDrafts.map((draft) => getFileKey(draft.fileId));
+          restoredFileIds.forEach((fileKey) => {
+            fileVersionsRef.current.set(fileKey, (fileVersionsRef.current.get(fileKey) || 0) + 1);
+          });
+          addDirtyFileKeys(restoredFileIds);
+        } else {
+          await Promise.all(recoverableDrafts.map((draft) => deleteEditorDraft(projectId, draft.fileId)));
+        }
+      }
+    }
+
+    filesRef.current = nextFileData;
+    setFiles(nextFileData);
+
+    const stillExists = nextFileData.some((file) => file.id === activeFileId);
     if (!stillExists) {
-      const defaultFile = fileData.find((file) => file.path === './sketch.js')
-        || fileData.find((file) => file.isText)
-        || fileData[0]
+      const defaultFile = nextFileData.find((file) => file.path === './sketch.js')
+        || nextFileData.find((file) => file.isText)
+        || nextFileData[0]
         || null;
       setActiveFileId(defaultFile?.id || null);
     }
@@ -216,7 +459,7 @@ const EditorView = () => {
 
     const init = async () => {
       try {
-        await loadProjectFiles();
+        await loadProjectFiles({ restoreDrafts: true, preserveDirty: false });
       } catch (err) {
         await appDialog.alert({
           title: '加载失败',
@@ -284,7 +527,7 @@ const EditorView = () => {
   };
 
   const handleToggleExampleMenu = async () => {
-    if (!canEdit || saving || importingExample) return;
+    if (!canEdit || saving || autoSaving || importingExample) return;
 
     if (exampleMenuOpen) {
       setExampleMenuOpen(false);
@@ -297,7 +540,7 @@ const EditorView = () => {
   };
 
   const handleImportExample = async (example) => {
-    if (!canEdit || saving || importingExample) return;
+    if (!canEdit || saving || autoSaving || importingExample) return;
 
     setExampleMenuOpen(false);
     const exampleName = getExampleName(example);
@@ -316,17 +559,19 @@ const EditorView = () => {
 
     setImportingExample(true);
     try {
+      await Promise.allSettled(Array.from(saveQueuesRef.current.values()));
       await requestJson(`/api/projects/${projectId}/import-example`, {
         method: 'POST',
         headers: { 'Accept-Language': language },
         body: JSON.stringify({ exampleId: example.id })
       });
+      await discardAllProjectDrafts();
       setPendingAiFiles(null);
       setAiMessages([]);
       setAiImages([]);
       setAiInput('');
       setActiveFileId(null);
-      await loadProjectFiles();
+      await loadProjectFiles({ preserveDirty: false });
       setPreviewUrl(getProjectPreviewUrl());
       await appDialog.alert({
         disableAutoTranslate: true,
@@ -348,24 +593,95 @@ const EditorView = () => {
     }
   };
 
+  const queueFileSave = async (file) => {
+    const fileKey = getFileKey(file.id);
+    const contentSnapshot = file.content || '';
+    const versionSnapshot = fileVersionsRef.current.get(fileKey) || 0;
+    const previousSave = saveQueuesRef.current.get(fileKey) || Promise.resolve();
+    const nextSave = previousSave.catch(() => {}).then(() => (
+      requestJson(`/api/files/${file.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ content: contentSnapshot })
+      })
+    ));
+    saveQueuesRef.current.set(fileKey, nextSave);
+
+    try {
+      await nextSave;
+      const currentFile = filesRef.current.find((item) => getFileKey(item.id) === fileKey);
+      const currentVersion = fileVersionsRef.current.get(fileKey) || 0;
+      if (currentFile && currentVersion === versionSnapshot && (currentFile.content || '') === contentSnapshot) {
+        removeDirtyFileKeys([fileKey]);
+        await deleteStoredDraft(fileKey, versionSnapshot);
+      }
+    } finally {
+      if (saveQueuesRef.current.get(fileKey) === nextSave) {
+        saveQueuesRef.current.delete(fileKey);
+      }
+    }
+  };
+
   const saveFilesToServer = async (filesToSave) => {
     if (!canEdit) return;
 
     const editableFiles = filesToSave.filter(isEditableTextFile);
-    await Promise.all(editableFiles.map(async (file) => {
-      await requestJson(`/api/files/${file.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ content: file.content || '' })
-      });
-    }));
+    await Promise.all(editableFiles.map((file) => queueFileSave(file)));
   };
 
-  const handleCodeChange = (newContent) => {
-    if (!activeFile || !canEdit) return;
-    setFiles((previousFiles) => previousFiles.map((file) => (
-      file.id === activeFile.id ? { ...file, content: newContent } : file
-    )));
+  const saveFilesInBackground = async (filesToSave) => {
+    activeAutoSaveCountRef.current += 1;
+    setAutoSaving(true);
+    try {
+      await saveFilesToServer(filesToSave);
+      autoSaveRetryDelayRef.current = AUTO_SAVE_DELAY;
+      setSaveError('');
+    } catch (err) {
+      autoSaveRetryDelayRef.current = Math.min(autoSaveRetryDelayRef.current * 2, 10000);
+      setSaveError(err.message);
+      throw err;
+    } finally {
+      activeAutoSaveCountRef.current -= 1;
+      if (activeAutoSaveCountRef.current === 0) setAutoSaving(false);
+    }
   };
+
+  const handleCodeChange = (fileId, newContent) => {
+    if (!canEdit) return;
+
+    const fileKey = getFileKey(fileId);
+    const currentFile = filesRef.current.find((file) => getFileKey(file.id) === fileKey);
+    if (!isEditableTextFile(currentFile) || (currentFile.content || '') === newContent) return;
+
+    const nextFile = { ...currentFile, content: newContent };
+    const nextFiles = filesRef.current.map((file) => (
+      getFileKey(file.id) === fileKey ? nextFile : file
+    ));
+    filesRef.current = nextFiles;
+    setFiles(nextFiles);
+    markFileDirty(nextFile);
+  };
+
+  const handleSelectFile = (file) => {
+    if (file.id === activeFileId) return;
+
+    const currentFile = filesRef.current.find((item) => item.id === activeFileId);
+    if (currentFile && dirtyFileIdsRef.current.has(getFileKey(currentFile.id))) {
+      void saveFilesInBackground([currentFile]).catch(() => {});
+    }
+    setActiveFileId(file.id);
+  };
+
+  useEffect(() => {
+    if (loading || !canEdit || saving || autoSaving || importingExample || dirtyFileIds.size === 0) return undefined;
+
+    const timeout = window.setTimeout(() => {
+      const dirtyFiles = filesRef.current.filter((file) => dirtyFileIdsRef.current.has(getFileKey(file.id)));
+      void saveFilesInBackground(dirtyFiles).catch(() => {});
+    }, autoSaveRetryDelayRef.current);
+
+    return () => window.clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files, dirtyFileIds, canEdit, loading, saving, autoSaving, importingExample]);
 
   const getAiFilePayload = () => {
     const payload = {};
@@ -501,15 +817,18 @@ const EditorView = () => {
       return;
     }
 
+    filesRef.current = nextFiles;
+    setFiles(nextFiles);
+    filesToSave.forEach((file) => markFileDirty(file));
     setSaving(true);
     try {
       await saveFilesToServer(filesToSave);
-      setFiles(nextFiles);
       setPendingAiFiles(null);
       setPreviewUrl(getProjectPreviewUrl());
       setActiveFileId(filesToSave[0].id);
       appendAiMessage('assistant', `已应用并保存 AI 修改：${filesToSave.map((file) => file.name).join('、')}`);
     } catch (err) {
+      setSaveError(err.message);
       appendAiMessage('error', err.message);
     } finally {
       setSaving(false);
@@ -517,19 +836,24 @@ const EditorView = () => {
   };
 
   const handleSaveActiveFile = async () => {
-    if (!canEdit || !isEditableTextFile(activeFile)) return;
+    if (!canEdit) return;
+
+    const dirtyFiles = filesRef.current.filter((file) => dirtyFileIdsRef.current.has(getFileKey(file.id)));
+    if (dirtyFiles.length === 0) return;
 
     setSaving(true);
     try {
-      await saveFilesToServer([activeFile]);
+      await saveFilesToServer(dirtyFiles);
+      setSaveError('');
       await appDialog.alert({
         title: '保存成功',
-        message: `"${activeFile.name}" 已保存。`
+        message: `${dirtyFiles.length} 个修改文件已全部保存。`
       });
     } catch (err) {
+      setSaveError(err.message);
       await appDialog.alert({
         title: '保存失败',
-        message: err.message
+        message: `${err.message}\n\n浏览器草稿已经保留，稍后会自动重试。`
       });
     } finally {
       setSaving(false);
@@ -539,9 +863,11 @@ const EditorView = () => {
   const handleRun = async () => {
     setSaving(true);
     try {
-      await saveFilesToServer(files);
+      await saveFilesToServer(filesRef.current);
+      setSaveError('');
       setPreviewUrl(getProjectPreviewUrl());
     } catch (err) {
+      setSaveError(err.message);
       await appDialog.alert({
         title: '运行失败',
         message: err.message
@@ -556,7 +882,8 @@ const EditorView = () => {
     setSaving(true);
 
     try {
-      await saveFilesToServer(files);
+      await saveFilesToServer(filesRef.current);
+      setSaveError('');
       const url = getProjectPreviewUrl();
       setPreviewUrl(url);
       if (previewWindow) {
@@ -565,6 +892,7 @@ const EditorView = () => {
         window.open(url, '_blank');
       }
     } catch (err) {
+      setSaveError(err.message);
       if (previewWindow) previewWindow.close();
       await appDialog.alert({
         title: '打开失败',
@@ -576,7 +904,7 @@ const EditorView = () => {
   };
 
   const handleCreateFile = async () => {
-    if (!canEdit) return;
+    if (!canEdit || saving || importingExample) return;
 
     const name = await appDialog.prompt({
       title: '新建文本文件',
@@ -617,7 +945,7 @@ const EditorView = () => {
   };
 
   const handleCreateFolder = async () => {
-    if (!canEdit) return;
+    if (!canEdit || saving || importingExample) return;
 
     const name = await appDialog.prompt({
       title: '新建文件夹',
@@ -648,7 +976,7 @@ const EditorView = () => {
   };
 
   const handleUpload = async (selectedFiles) => {
-    if (!canEdit) return;
+    if (!canEdit || saving || importingExample) return;
 
     const parentPath = getParentPath(activeFile);
 
@@ -680,7 +1008,7 @@ const EditorView = () => {
   };
 
   const handleRename = async (file) => {
-    if (!canEdit || file.path === './index.html') return;
+    if (!canEdit || saving || importingExample || file.path === './index.html') return;
 
     const name = await appDialog.prompt({
       title: '重命名',
@@ -691,7 +1019,15 @@ const EditorView = () => {
     });
     if (!name || name === file.name) return;
 
+    setSaving(true);
     try {
+      const affectedFileKeys = filesRef.current
+        .filter((item) => item.path === file.path || item.path.startsWith(`${file.path}/`))
+        .map((item) => getFileKey(item.id));
+      const pendingSaves = affectedFileKeys
+        .map((fileKey) => saveQueuesRef.current.get(fileKey))
+        .filter(Boolean);
+      await Promise.allSettled(pendingSaves);
       await requestJson(`/api/files/${file.id}/rename`, {
         method: 'PATCH',
         body: JSON.stringify({ name })
@@ -702,11 +1038,13 @@ const EditorView = () => {
         title: '重命名失败',
         message: err.message
       });
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async (file) => {
-    if (!canEdit || file.path === './index.html') return;
+    if (!canEdit || saving || importingExample || file.path === './index.html') return;
 
     const ok = await appDialog.confirm({
       title: '删除文件',
@@ -716,14 +1054,25 @@ const EditorView = () => {
     });
     if (!ok) return;
 
+    setSaving(true);
     try {
+      const affectedFiles = filesRef.current.filter((item) => (
+        item.path === file.path || item.path.startsWith(`${file.path}/`)
+      ));
+      const pendingSaves = affectedFiles
+        .map((item) => saveQueuesRef.current.get(getFileKey(item.id)))
+        .filter(Boolean);
+      await Promise.allSettled(pendingSaves);
       await requestJson(`/api/files/${file.id}`, { method: 'DELETE' });
+      await discardFileDrafts(affectedFiles.map((item) => item.id));
       await loadProjectFiles();
     } catch (err) {
       await appDialog.alert({
         title: '删除失败',
         message: err.message
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -827,12 +1176,34 @@ const EditorView = () => {
                 只读
               </span>
             )}
+            {canEdit && (
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                  saveError
+                    ? 'bg-rose-100 text-rose-600'
+                    : saving || autoSaving
+                      ? 'bg-sky-100 text-sky-600'
+                      : dirtyFileIds.size > 0
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                }`}
+                title={saveError || undefined}
+              >
+                {saveError
+                  ? (isEnglish ? 'Draft saved locally' : '保存失败，草稿已保留')
+                  : saving || autoSaving
+                    ? (isEnglish ? 'Saving...' : '正在自动保存...')
+                    : dirtyFileIds.size > 0
+                      ? (isEnglish ? `${dirtyFileIds.size} unsaved` : `${dirtyFileIds.size} 个修改待保存`)
+                      : (isEnglish ? 'Saved' : '已保存')}
+              </span>
+            )}
           </div>
           <div ref={exampleMenuRef} data-i18n-skip className="relative">
             <button
               type="button"
               onClick={handleToggleExampleMenu}
-              disabled={!canEdit || saving || importingExample}
+              disabled={!canEdit || saving || autoSaving || importingExample}
               className="flex items-center gap-1.5 rounded-xl border-2 border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-45"
               title={canEdit ? (isEnglish ? 'Import an example program' : '导入例子程序') : (isEnglish ? 'Read-only projects cannot import examples' : '只读项目不能导入例子')}
             >
@@ -890,16 +1261,16 @@ const EditorView = () => {
           <button
             type="button"
             onClick={handleSaveActiveFile}
-            disabled={saving || importingExample || !canEdit || !isEditableTextFile(activeFile)}
+            disabled={saving || autoSaving || importingExample || !canEdit || dirtyFileIds.size === 0}
             className="flex items-center space-x-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 px-4 py-2 rounded-2xl text-xs font-black border-b-4 border-amber-600 active:border-b-0 active:translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
-            <span>{saving ? '正在封存...' : '保存魔法书'}</span>
+            <span>{saving ? '正在封存...' : '保存全部修改'}</span>
           </button>
           <button
             type="button"
             onClick={handleRun}
-            disabled={saving || importingExample}
+            disabled={saving || autoSaving || importingExample}
             className="flex items-center space-x-1.5 bg-emerald-400 hover:bg-emerald-300 text-white px-5 py-2 rounded-2xl text-xs font-black border-b-4 border-emerald-600 active:border-b-0 active:translate-y-1 transition-all shadow-sm disabled:opacity-50"
           >
             <Play className="w-4 h-4 fill-current" />
@@ -913,7 +1284,7 @@ const EditorView = () => {
           files={files}
           activeFileId={activeFileId}
           canEdit={canEdit}
-          onSelect={(file) => setActiveFileId(file.id)}
+          onSelect={handleSelectFile}
           onCreateFile={handleCreateFile}
           onCreateFolder={handleCreateFolder}
           onUpload={handleUpload}
@@ -936,9 +1307,10 @@ const EditorView = () => {
           <div className={`h-full bg-[#1e1e1e] overflow-hidden border-2 border-transparent ${isVerticalLayout ? 'rounded-b-2xl' : 'rounded-l-2xl'}`}>
             {isEditableTextFile(activeFile) ? (
               <CodeEditor
+                key={getFileKey(activeFile.id)}
                 fileName={activeFile.path}
                 value={activeFile.content || ''}
-                onChange={handleCodeChange}
+                onChange={(newContent) => handleCodeChange(activeFile.id, newContent)}
                 readOnly={!canEdit}
                 fontSize={codeFontSize}
                 onFontSizeChange={handleCodeFontSizeChange}

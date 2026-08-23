@@ -1,5 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
+const crypto = require('crypto');
 const Project = require('../models/projectModel');
 const File = require('../models/fileModel');
 
@@ -70,6 +71,26 @@ function getSafePhysicalPath(projectId, relativePath) {
 
 function isTextFile(filename) {
   return TEXT_EXTENSIONS.has(path.extname(filename).toLowerCase());
+}
+
+async function writeTextFileAtomically(targetPath, content) {
+  const temporaryPath = path.join(
+    path.dirname(targetPath),
+    `.${path.basename(targetPath)}.${process.pid}.${crypto.randomUUID()}.tmp`
+  );
+  let handle = null;
+
+  try {
+    handle = await fs.open(temporaryPath, 'wx');
+    await handle.writeFile(content, 'utf8');
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    await fs.rename(temporaryPath, targetPath);
+  } finally {
+    if (handle) await handle.close().catch(() => {});
+    await fs.rm(temporaryPath, { force: true }).catch(() => {});
+  }
 }
 
 function toPublicUrl(projectId, relativePath) {
@@ -325,7 +346,7 @@ exports.saveFileContent = async (req, res, next) => {
     }
 
     const physicalPath = getSafePhysicalPath(file.project_id, file.path);
-    await fs.writeFile(physicalPath, content || '', 'utf8');
+    await writeTextFileAtomically(physicalPath, content || '');
     await File.touchUpdatedAt(fileId);
 
     res.json({ message: '代码文件已安全同步至磁盘。' });
