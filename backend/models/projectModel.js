@@ -7,7 +7,7 @@ exports.getConnection = () => db.getConnection();
 
 exports.listForUser = async (userId, parentId = null) => {
   const [rows] = await db.query(
-    `SELECT id, name, parent_id, sort_order, created_at, updated_at FROM projects WHERE user_id = ? AND ${parentId === null ? 'parent_id IS NULL' : 'parent_id = ?'} ORDER BY sort_order ASC, updated_at DESC`,
+    `SELECT id, name, parent_id, sort_order, created_at, updated_at FROM projects WHERE project_type = 'p5js' AND user_id = ? AND ${parentId === null ? 'parent_id IS NULL' : 'parent_id = ?'} ORDER BY sort_order ASC, updated_at DESC`,
     parentId === null ? [userId] : [userId, parentId]
   );
   return rows;
@@ -15,7 +15,7 @@ exports.listForUser = async (userId, parentId = null) => {
 
 exports.listAdminPaginated = async ({ limit, offset, authorName = '' }) => {
   const keyword = authorName.trim();
-  const whereClause = keyword ? ' WHERE u.username LIKE ?' : '';
+  const whereClause = keyword ? " WHERE p.project_type = 'p5js' AND u.username LIKE ?" : " WHERE p.project_type = 'p5js'";
   const params = keyword ? [`%${keyword}%`, limit, offset] : [limit, offset];
   const [rows] = await db.query(
     `SELECT p.id, p.name, u.username AS author_name, p.created_at FROM projects p JOIN users u ON p.user_id = u.id${whereClause} ORDER BY p.created_at DESC, p.id DESC LIMIT ? OFFSET ?`,
@@ -26,7 +26,7 @@ exports.listAdminPaginated = async ({ limit, offset, authorName = '' }) => {
 
 exports.countAdminProjects = async ({ authorName = '' } = {}) => {
   const keyword = authorName.trim();
-  const whereClause = keyword ? ' WHERE u.username LIKE ?' : '';
+  const whereClause = keyword ? " WHERE p.project_type = 'p5js' AND u.username LIKE ?" : " WHERE p.project_type = 'p5js'";
   const params = keyword ? [`%${keyword}%`] : [];
   const [rows] = await db.query(`SELECT COUNT(*) AS total FROM projects p JOIN users u ON p.user_id = u.id${whereClause}`, params);
   return Number(rows[0]?.total || 0);
@@ -50,7 +50,7 @@ exports.listVisibleToUser = async ({ currentUser, studentId, parentId = null }) 
      FROM projects p
      JOIN users u ON p.user_id = u.id
      JOIN classes c ON u.class_code = c.class_code
-     WHERE p.user_id = ? AND u.role = "student" AND c.teacher_user_id = ? AND ${parentId === null ? 'p.parent_id IS NULL' : 'p.parent_id = ?'}
+     WHERE p.project_type = 'p5js' AND p.user_id = ? AND u.role = "student" AND c.teacher_user_id = ? AND ${parentId === null ? 'p.parent_id IS NULL' : 'p.parent_id = ?'}
      ORDER BY p.sort_order ASC, p.updated_at DESC`,
     parentId === null ? [studentId, currentUser.id] : [studentId, currentUser.id, parentId]
   );
@@ -63,7 +63,7 @@ const findTeacherAccessibleProjectById = async (projectId, user) => {
      FROM projects p
      JOIN users u ON p.user_id = u.id
      JOIN classes c ON u.class_code = c.class_code
-     WHERE p.id = ? AND u.role = "student" AND c.teacher_user_id = ?`,
+     WHERE p.project_type = 'p5js' AND p.id = ? AND u.role = "student" AND c.teacher_user_id = ?`,
     [projectId, user.id]
   );
   return rows[0] || null;
@@ -75,7 +75,7 @@ const findTeacherAccessibleProjectWithOwnerById = async (projectId, user) => {
      FROM projects p
      JOIN users u ON p.user_id = u.id
      JOIN classes c ON u.class_code = c.class_code
-     WHERE p.id = ? AND u.role = "student" AND c.teacher_user_id = ?`,
+     WHERE p.project_type = 'p5js' AND p.id = ? AND u.role = "student" AND c.teacher_user_id = ?`,
     [projectId, user.id]
   );
   return rows[0] || null;
@@ -83,14 +83,14 @@ const findTeacherAccessibleProjectWithOwnerById = async (projectId, user) => {
 
 exports.createWithConnection = async (connection, { id, userId, name, parentId = null, sortOrder = 0 }) => {
   await connection.query(
-    'INSERT INTO projects (id, user_id, name, parent_id, sort_order) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO projects (id, user_id, name, parent_id, sort_order, project_type) VALUES (?, ?, ?, ?, ?, \'p5js\')',
     [id, userId, name, parentId, sortOrder]
   );
 };
 
 exports.findOwnedById = async (projectId, userId) => {
   const [rows] = await db.query(
-    'SELECT id, user_id, parent_id, sort_order FROM projects WHERE id = ? AND user_id = ?',
+    'SELECT id, user_id, parent_id, sort_order FROM projects WHERE project_type = \'p5js\' AND id = ? AND user_id = ?',
     [projectId, userId]
   );
   return rows[0] || null;
@@ -98,7 +98,7 @@ exports.findOwnedById = async (projectId, userId) => {
 
 exports.findOwnedByIdWithConnection = async (connection, projectId, userId) => {
   const [rows] = await connection.query(
-    'SELECT id, user_id, parent_id, sort_order FROM projects WHERE id = ? AND user_id = ? FOR UPDATE',
+    'SELECT id, user_id, parent_id, sort_order FROM projects WHERE project_type = \'p5js\' AND id = ? AND user_id = ? FOR UPDATE',
     [projectId, userId]
   );
   return rows[0] || null;
@@ -106,14 +106,14 @@ exports.findOwnedByIdWithConnection = async (connection, projectId, userId) => {
 
 exports.findAccessibleById = async (projectId, user) => {
   if (canAccessAllProjects(user)) {
-    const [rows] = await db.query('SELECT id, name, user_id FROM projects WHERE id = ?', [projectId]);
+    const [rows] = await db.query('SELECT id, name, user_id FROM projects WHERE project_type = \'p5js\' AND id = ?', [projectId]);
     return rows[0] || null;
   }
 
   if (canUseTeacherFeatures(user)) {
     const ownProject = await exports.findOwnedById(projectId, user.id);
     if (ownProject) {
-      const [rows] = await db.query('SELECT id, name, user_id FROM projects WHERE id = ?', [projectId]);
+      const [rows] = await db.query('SELECT id, name, user_id FROM projects WHERE project_type = \'p5js\' AND id = ?', [projectId]);
       return rows[0] || null;
     }
 
@@ -121,7 +121,7 @@ exports.findAccessibleById = async (projectId, user) => {
   }
 
   const [rows] = await db.query(
-    'SELECT id, name, user_id FROM projects WHERE id = ? AND user_id = ?',
+    'SELECT id, name, user_id FROM projects WHERE project_type = \'p5js\' AND id = ? AND user_id = ?',
     [projectId, user.id]
   );
   return rows[0] || null;
@@ -133,7 +133,7 @@ exports.findAccessibleWithOwnerById = async (projectId, user) => {
       `SELECT p.id, p.name, p.user_id, u.username AS owner_name
        FROM projects p
        JOIN users u ON p.user_id = u.id
-       WHERE p.id = ?`,
+       WHERE p.project_type = 'p5js' AND p.id = ?`,
       [projectId]
     );
     return rows[0] || null;
@@ -144,7 +144,7 @@ exports.findAccessibleWithOwnerById = async (projectId, user) => {
       `SELECT p.id, p.name, p.user_id, u.username AS owner_name
        FROM projects p
        JOIN users u ON p.user_id = u.id
-       WHERE p.id = ? AND p.user_id = ?`,
+       WHERE p.project_type = 'p5js' AND p.id = ? AND p.user_id = ?`,
       [projectId, user.id]
     );
     if (ownRows[0]) return ownRows[0];
@@ -156,20 +156,20 @@ exports.findAccessibleWithOwnerById = async (projectId, user) => {
     `SELECT p.id, p.name, p.user_id, u.username AS owner_name
      FROM projects p
      JOIN users u ON p.user_id = u.id
-     WHERE p.id = ? AND p.user_id = ?`,
+     WHERE p.project_type = 'p5js' AND p.id = ? AND p.user_id = ?`,
     [projectId, user.id]
   );
   return rows[0] || null;
 };
 
 exports.deleteById = async (projectId) => {
-  const [result] = await db.query('DELETE FROM projects WHERE id = ?', [projectId]);
+  const [result] = await db.query('DELETE FROM projects WHERE project_type = \'p5js\' AND id = ?', [projectId]);
   return result.affectedRows;
 };
 
 exports.updateName = async ({ projectId, userId, name }) => {
   const [result] = await db.query(
-    'UPDATE projects SET name = ? WHERE id = ? AND user_id = ?',
+    'UPDATE projects SET name = ? WHERE project_type = \'p5js\' AND id = ? AND user_id = ?',
     [name, projectId, userId]
   );
   return result.affectedRows;
@@ -177,7 +177,7 @@ exports.updateName = async ({ projectId, userId, name }) => {
 
 exports.move = async ({ projectId, userId, parentId = null }) => {
   const [result] = await db.query(
-    'UPDATE projects SET parent_id = ? WHERE id = ? AND user_id = ?',
+    'UPDATE projects SET parent_id = ? WHERE project_type = \'p5js\' AND id = ? AND user_id = ?',
     [parentId, projectId, userId]
   );
   return result.affectedRows;
@@ -188,7 +188,7 @@ exports.reposition = async ({ projectId, userId, parentId = null, beforeId = nul
 
   const listSiblingIds = async (siblingParentId) => {
     const [rows] = await connection.query(
-      `SELECT id FROM projects WHERE user_id = ? AND ${siblingParentId === null ? 'parent_id IS NULL' : 'parent_id = ?'} ORDER BY sort_order ASC, updated_at DESC FOR UPDATE`,
+      `SELECT id FROM projects WHERE project_type = 'p5js' AND user_id = ? AND ${siblingParentId === null ? 'parent_id IS NULL' : 'parent_id = ?'} ORDER BY sort_order ASC, updated_at DESC FOR UPDATE`,
       siblingParentId === null ? [userId] : [userId, siblingParentId]
     );
     return rows.map((row) => String(row.id));
@@ -197,7 +197,7 @@ exports.reposition = async ({ projectId, userId, parentId = null, beforeId = nul
   const updateSiblingOrder = async (siblingParentId, orderedIds) => {
     for (let index = 0; index < orderedIds.length; index += 1) {
       await connection.query(
-        `UPDATE projects SET sort_order = ?, updated_at = updated_at WHERE id = ? AND user_id = ? AND ${siblingParentId === null ? 'parent_id IS NULL' : 'parent_id = ?'}`,
+        `UPDATE projects SET sort_order = ?, updated_at = updated_at WHERE project_type = 'p5js' AND id = ? AND user_id = ? AND ${siblingParentId === null ? 'parent_id IS NULL' : 'parent_id = ?'}`,
         siblingParentId === null ? [index, orderedIds[index], userId] : [index, orderedIds[index], userId, siblingParentId]
       );
     }
@@ -207,7 +207,7 @@ exports.reposition = async ({ projectId, userId, parentId = null, beforeId = nul
     await connection.beginTransaction();
 
     const [sourceRows] = await connection.query(
-      'SELECT id, parent_id FROM projects WHERE id = ? AND user_id = ? FOR UPDATE',
+      'SELECT id, parent_id FROM projects WHERE project_type = \'p5js\' AND id = ? AND user_id = ? FOR UPDATE',
       [projectId, userId]
     );
     const sourceProject = sourceRows[0];
@@ -218,7 +218,7 @@ exports.reposition = async ({ projectId, userId, parentId = null, beforeId = nul
 
     if (parentId !== null) {
       const [parentRows] = await connection.query(
-        'SELECT id FROM project_groups WHERE id = ? AND user_id = ? FOR UPDATE',
+        'SELECT id FROM project_groups WHERE project_type = \'p5js\' AND id = ? AND user_id = ? FOR UPDATE',
         [parentId, userId]
       );
       if (!parentRows[0]) {
@@ -241,7 +241,7 @@ exports.reposition = async ({ projectId, userId, parentId = null, beforeId = nul
     nextTargetIds.splice(insertIndex, 0, projectId);
 
     await connection.query(
-      'UPDATE projects SET parent_id = ? WHERE id = ? AND user_id = ?',
+      'UPDATE projects SET parent_id = ? WHERE project_type = \'p5js\' AND id = ? AND user_id = ?',
       [parentId, projectId, userId]
     );
 
@@ -268,7 +268,7 @@ exports.reorder = async ({ userId, parentId = null, orderedIds }) => {
 
     for (let index = 0; index < orderedIds.length; index += 1) {
       await connection.query(
-        `UPDATE projects SET sort_order = ? WHERE id = ? AND user_id = ? AND ${parentId === null ? 'parent_id IS NULL' : 'parent_id = ?'}`,
+        `UPDATE projects SET sort_order = ? WHERE project_type = 'p5js' AND id = ? AND user_id = ? AND ${parentId === null ? 'parent_id IS NULL' : 'parent_id = ?'}`,
         parentId === null ? [index, orderedIds[index], userId] : [index, orderedIds[index], userId, parentId]
       );
     }
@@ -284,7 +284,7 @@ exports.reorder = async ({ userId, parentId = null, orderedIds }) => {
 
 exports.clearParentId = async ({ userId, parentId }) => {
   const [result] = await db.query(
-    'UPDATE projects SET parent_id = NULL WHERE user_id = ? AND parent_id = ?',
+    'UPDATE projects SET parent_id = NULL WHERE project_type = \'p5js\' AND user_id = ? AND parent_id = ?',
     [userId, parentId]
   );
   return result.affectedRows;
