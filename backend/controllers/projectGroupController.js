@@ -57,7 +57,15 @@ exports.listGroups = async (req, res, next) => {
 
 exports.listAllGroups = async (req, res, next) => {
   try {
-    const groups = await ProjectGroup.listAllForUser(req.user.id);
+    const ownerId = await resolveReadableOwnerId({
+      currentUser: req.user,
+      studentId: req.query.studentId
+    });
+    if (!ownerId) {
+      return res.status(403).json({ message: '无权查看作品组。' });
+    }
+
+    const groups = await ProjectGroup.listAllForUser(ownerId);
     res.json({ groups });
   } catch (err) {
     next(err);

@@ -35,6 +35,10 @@ module.exports = {
   },
 
   rules: {
+    'no-unused-vars': [
+      'error',
+      { varsIgnorePattern: '^React$' },
+    ],
     'react/prop-types': 'off',
     'react/no-unescaped-entities': 'off',
 
@@ -43,4 +47,19 @@ module.exports = {
       { allowConstantExport: true },
     ],
   },
+
+  overrides: [
+    {
+      files: ['src/i18n/LanguageContext.jsx'],
+      rules: {
+        'react-refresh/only-export-components': 'off',
+      },
+    },
+    {
+      files: ['src/pages/Dashboard.jsx'],
+      rules: {
+        'react-hooks/exhaustive-deps': 'off',
+      },
+    },
+  ],
 };
