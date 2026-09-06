@@ -1,0 +1,323 @@
+.p5-project-organizer {
+  width: 100%;
+}
+
+.p5-project-organizer .tigao-organizer {
+  --organizer-color-text: #1e293b;
+  --organizer-color-muted: #94a3b8;
+  --organizer-color-surface: #ffffff;
+  --organizer-color-subtle: #eef2ff;
+  --organizer-color-accent: #818cf8;
+  --organizer-color-accent-soft: #e0e7ff;
+  --organizer-color-danger: #f43f5e;
+  --organizer-color-border: #c7d2fe;
+  --organizer-radius: 2rem;
+  --organizer-gap: 1.5rem;
+  --organizer-shadow: 0 4px 8px rgba(0, 0, 0, 0.03);
+  font-family: inherit;
+}
+
+.p5-project-organizer .tigao-organizer__header,
+.p5-project-organizer .tigao-organizer__create-panel {
+  display: none;
+}
+
+.p5-project-organizer .tigao-organizer__breadcrumbs {
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.p5-project-organizer .tigao-organizer__breadcrumb {
+  border: 0;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0.375rem 0.75rem;
+  color: #64748b;
+  font-weight: 900;
+  transition: all 150ms ease;
+}
+
+.p5-project-organizer .tigao-organizer__breadcrumb:hover,
+.p5-project-organizer .tigao-organizer__breadcrumb[aria-current="page"] {
+  background: #818cf8;
+  color: #ffffff;
+}
+
+.p5-project-organizer .tigao-organizer__breadcrumb--over {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.p5-project-organizer .tigao-organizer__content {
+  gap: 1.5rem;
+}
+
+.p5-project-organizer .tigao-organizer__section {
+  gap: 0.75rem;
+}
+
+.p5-project-organizer .tigao-organizer__section h2 {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.p5-project-organizer .tigao-organizer__grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.p5-project-organizer .tigao-organizer__card {
+  min-height: 11rem;
+  overflow: hidden;
+  border-width: 4px;
+  border-radius: 2rem;
+  box-shadow: var(--organizer-shadow);
+  transition: transform 300ms ease, box-shadow 300ms ease, opacity 150ms ease;
+}
+
+.p5-project-organizer .tigao-organizer__card:hover {
+  transform: translateY(-0.375rem);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
+}
+
+.p5-project-organizer .tigao-organizer__card::after {
+  position: absolute;
+  top: -1.25rem;
+  right: -1.25rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1rem;
+  background: currentColor;
+  content: "";
+  opacity: 0.12;
+  transform: rotate(12deg);
+  pointer-events: none;
+}
+
+.p5-project-organizer .tigao-organizer__card::before {
+  position: absolute;
+  z-index: 1;
+  top: 0.9rem;
+  right: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 9999px;
+  padding: 0.18rem 0.55rem;
+  content: "p5.js 魔法箱";
+  font-size: 0.625rem;
+  font-weight: 900;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.p5-project-organizer .tigao-organizer__card--group {
+  border-color: #c7d2fe;
+  background: rgba(238, 242, 255, 0.78);
+  color: #4338ca;
+}
+
+.p5-project-organizer .tigao-organizer__card--group::before {
+  content: "文件夹";
+}
+
+.p5-project-organizer .tigao-organizer__card--project:nth-child(5n + 1) {
+  border-color: #7dd3fc;
+  background: rgba(240, 249, 255, 0.78);
+  color: #0284c7;
+}
+
+.p5-project-organizer .tigao-organizer__card--project:nth-child(5n + 2) {
+  border-color: #fcd34d;
+  background: rgba(255, 251, 235, 0.78);
+  color: #d97706;
+}
+
+.p5-project-organizer .tigao-organizer__card--project:nth-child(5n + 3) {
+  border-color: #6ee7b7;
+  background: rgba(236, 253, 245, 0.78);
+  color: #059669;
+}
+
+.p5-project-organizer .tigao-organizer__card--project:nth-child(5n + 4) {
+  border-color: #fda4af;
+  background: rgba(255, 241, 242, 0.78);
+  color: #e11d48;
+}
+
+.p5-project-organizer .tigao-organizer__card--project:nth-child(5n) {
+  border-color: #d8b4fe;
+  background: rgba(250, 245, 255, 0.78);
+  color: #9333ea;
+}
+
+.p5-project-organizer .tigao-organizer__item-main {
+  min-height: 6.9rem;
+  align-items: flex-start;
+  padding: 1.25rem;
+  color: inherit;
+}
+
+.p5-project-organizer .tigao-organizer__item-symbol {
+  flex-basis: 2.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.72);
+  color: currentColor;
+}
+
+.p5-project-organizer .tigao-organizer__item-copy {
+  gap: 0.45rem;
+  padding-right: 4.6rem;
+}
+
+.p5-project-organizer .tigao-organizer__item-copy strong {
+  color: currentColor;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.p5-project-organizer .tigao-organizer__item-copy small {
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.025em;
+}
+
+.p5-project-organizer .tigao-organizer__item-copy small::before {
+  content: "更新时间: ";
+}
+
+.p5-project-organizer .tigao-organizer__open-label {
+  display: none;
+}
+
+.p5-project-organizer .tigao-organizer__card-actions {
+  min-height: 3.5rem;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  border-top-width: 2px;
+  border-top-color: rgba(226, 232, 240, 0.8);
+  padding: 0.65rem 0.9rem;
+}
+
+.p5-project-organizer .tigao-organizer__icon-button,
+.p5-project-organizer .p5-project-organizer__host-action {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.p5-project-organizer .tigao-organizer__icon-button:hover:not(:disabled) {
+  background: #eef2ff;
+  color: #6366f1;
+}
+
+.p5-project-organizer .tigao-organizer__icon-button:last-of-type:hover:not(:disabled) {
+  background: #fff1f2;
+  color: #f43f5e;
+}
+
+.p5-project-organizer .p5-project-organizer__host-action--copy:hover:not(:disabled) {
+  background: #ecfdf5;
+  color: #10b981;
+}
+
+.p5-project-organizer .p5-project-organizer__host-action--distribute:hover:not(:disabled) {
+  background: #fffbeb;
+  color: #f59e0b;
+}
+
+.p5-project-organizer .tigao-organizer__nest-target {
+  position: absolute;
+  z-index: 2;
+  inset: 1.75rem;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border-width: 2px;
+  border-color: #6ee7b7;
+  border-radius: 1rem;
+  background: rgba(236, 253, 245, 0.96);
+  color: #047857;
+  font-weight: 900;
+}
+
+.p5-project-organizer .tigao-organizer__readonly,
+.p5-project-organizer .tigao-organizer__empty,
+.p5-project-organizer__loading {
+  border: 4px dashed #cbd5e1;
+  border-radius: 2.5rem;
+  background: rgba(255, 255, 255, 0.7);
+  color: #94a3b8;
+  padding: 4.5rem 1.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 900;
+}
+
+.p5-project-organizer .tigao-organizer__readonly {
+  border-width: 2px;
+  border-style: solid;
+  border-color: #c7d2fe;
+  border-radius: 1rem;
+  background: rgba(238, 242, 255, 0.8);
+  color: #6366f1;
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+
+.p5-project-organizer .tigao-organizer__dialog {
+  border: 4px solid #ffffff;
+  border-radius: 2rem;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.p5-project-organizer .tigao-organizer__dialog button,
+.p5-project-organizer .tigao-organizer__dialog input {
+  border-width: 2px;
+  border-radius: 1rem;
+}
+
+.p5-project-organizer :where(button, input):focus-visible {
+  outline-color: rgba(129, 140, 248, 0.6);
+}
+
+.p5-project-organizer :where(button):disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media (max-width: 1023px) {
+  .p5-project-organizer .tigao-organizer__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .p5-project-organizer .tigao-organizer__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .p5-project-organizer .tigao-organizer__item-copy {
+    padding-right: 3.8rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .p5-project-organizer .tigao-organizer__card {
+    transition: none;
+  }
+}

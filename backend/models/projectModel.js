@@ -46,7 +46,7 @@ exports.listVisibleToUser = async ({ currentUser, studentId, parentId = null }) 
   }
 
   const [rows] = await db.query(
-    `SELECT p.id, p.name, p.created_at, p.updated_at
+    `SELECT p.id, p.name, p.parent_id, p.sort_order, p.created_at, p.updated_at
      FROM projects p
      JOIN users u ON p.user_id = u.id
      JOIN classes c ON u.class_code = c.class_code

@@ -5,4 +5,3 @@ backend/backup_teaching_p5js_full.sh
 backend/compare-p5js-backend.ps1
 frontend/dist/
 frontend/node_modules/
-frontend/package-lock.json

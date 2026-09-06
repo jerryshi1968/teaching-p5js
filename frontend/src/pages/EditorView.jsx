@@ -476,12 +476,14 @@ const EditorView = () => {
     return () => {
       isMounted = false;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   useEffect(() => {
     if (isAutoRunEnabled && !loading && files.length > 0) {
       handleRun();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, isAutoRunEnabled]);
 
   useEffect(() => {
