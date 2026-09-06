@@ -72,11 +72,14 @@
 }
 
 .p5-project-organizer .tigao-organizer__card {
+  display: flex;
+  flex-direction: column;
   min-height: 11rem;
   overflow: hidden;
   border-width: 4px;
   border-radius: 2rem;
   box-shadow: var(--organizer-shadow);
+  padding-bottom: 3rem;
   transition: transform 300ms ease, box-shadow 300ms ease, opacity 150ms ease;
 }
 
@@ -102,7 +105,7 @@
 .p5-project-organizer .tigao-organizer__card::before {
   position: absolute;
   z-index: 1;
-  top: 0.9rem;
+  bottom: 0.55rem;
   right: 1rem;
   border: 1px solid currentColor;
   border-radius: 9999px;
@@ -154,25 +157,34 @@
   color: #9333ea;
 }
 
+.p5-project-organizer .tigao-organizer__card--project .tigao-organizer__item-symbol {
+  color: #fb923c;
+}
+
+.p5-project-organizer .tigao-organizer__card--project .tigao-organizer__item-copy strong {
+  color: #0f172a;
+}
+
 .p5-project-organizer .tigao-organizer__item-main {
-  min-height: 6.9rem;
+  min-height: 3.8rem;
   align-items: flex-start;
-  padding: 1.25rem;
+  gap: 0.55rem;
+  padding: 1.25rem 1.25rem 0.4rem;
   color: inherit;
 }
 
 .p5-project-organizer .tigao-organizer__item-symbol {
-  flex-basis: 2.75rem;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.72);
+  flex-basis: 1.4rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 0;
+  background: transparent;
   color: currentColor;
 }
 
 .p5-project-organizer .tigao-organizer__item-copy {
-  gap: 0.45rem;
-  padding-right: 4.6rem;
+  gap: 0;
+  padding-right: 2.5rem;
 }
 
 .p5-project-organizer .tigao-organizer__item-copy strong {
@@ -182,6 +194,10 @@
 }
 
 .p5-project-organizer .tigao-organizer__item-copy small {
+  position: absolute;
+  bottom: 0.85rem;
+  left: 1.25rem;
+  max-width: calc(100% - 7rem);
   color: #94a3b8;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.625rem;
@@ -196,13 +212,58 @@
   display: none;
 }
 
+.p5-project-organizer .tigao-organizer__card--group .tigao-organizer__item-copy small {
+  display: none;
+}
+
+.p5-project-organizer .tigao-organizer__card--group .tigao-organizer__open-label {
+  position: absolute;
+  bottom: 0.85rem;
+  left: 1.25rem;
+  display: block;
+  color: #94a3b8;
+  font-size: 0.625rem;
+  font-weight: 900;
+}
+
 .p5-project-organizer .tigao-organizer__card-actions {
   min-height: 3.5rem;
   justify-content: flex-end;
   gap: 0.25rem;
-  border-top-width: 2px;
-  border-top-color: rgba(226, 232, 240, 0.8);
-  padding: 0.65rem 0.9rem;
+  margin: 0 1.25rem;
+  border-top: 0;
+  border-bottom-width: 2px;
+  border-bottom-color: rgba(226, 232, 240, 0.8);
+  padding: 0.25rem 0 0.65rem;
+}
+
+.p5-project-organizer .tigao-organizer__drag-handle {
+  order: 1;
+}
+
+.p5-project-organizer .p5-project-organizer__host-action--distribute,
+.p5-project-organizer .p5-project-organizer__host-action--copy {
+  order: 2;
+}
+
+.p5-project-organizer .tigao-organizer__card-actions > .tigao-organizer__icon-button:nth-child(2) {
+  order: 3;
+}
+
+.p5-project-organizer .tigao-organizer__card-actions > .tigao-organizer__icon-button:nth-child(3) {
+  order: 4;
+}
+
+.p5-project-organizer .tigao-organizer__card-actions > .tigao-organizer__icon-button:nth-child(5) {
+  order: 5;
+}
+
+.p5-project-organizer .tigao-organizer__card-actions > .tigao-organizer__icon-button:nth-child(4) {
+  order: 6;
+}
+
+.p5-project-organizer .tigao-organizer__card-actions > .tigao-organizer__icon-button:nth-child(6) {
+  order: 7;
 }
 
 .p5-project-organizer .tigao-organizer__icon-button,

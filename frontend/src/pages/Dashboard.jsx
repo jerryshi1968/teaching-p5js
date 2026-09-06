@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Folder, GripVertical, MoveRight, Plus, Trash2, User, LogOut, Sparkles, Star, Palette, Pencil, Copy, ShieldCheck, Send } from 'lucide-react';
+import { ArrowDown, ArrowUp, Folder, GripVertical, MoveRight, Plus, Trash2, User, LogOut, Sparkles, Palette, Pencil, Copy, ShieldCheck, Send } from 'lucide-react';
 import { ProjectOrganizer } from '@tigao/organizer-react';
 import '@tigao/organizer-react/styles.css';
 import './Dashboard.css';
@@ -74,7 +74,7 @@ const saveDashboardGroupId = (userId, studentId, groupId) => {
 // 定义马卡龙卡通色系，让项目卡片五彩缤纷
 const ORGANIZER_ICONS = {
   group: (props) => <Folder {...props} className="w-6 h-6" />,
-  project: (props) => <Star {...props} className="w-6 h-6" />,
+  project: (props) => <Sparkles {...props} className="w-6 h-6" />,
   drag: (props) => <GripVertical {...props} className="w-5 h-5" />,
   up: (props) => <ArrowUp {...props} className="w-5 h-5" />,
   down: (props) => <ArrowDown {...props} className="w-5 h-5" />,
@@ -187,7 +187,7 @@ const Dashboard = () => {
     createProject: 'Create project',
     groupName: 'Group name',
     projectName: 'Project name',
-    open: 'Open',
+    open: 'Open group',
     rename: 'Rename',
     move: 'Move',
     delete: 'Delete',
@@ -219,7 +219,7 @@ const Dashboard = () => {
     createProject: '新建作品',
     groupName: '作品组名称',
     projectName: '作品名称',
-    open: '打开',
+    open: '点击进入作品组',
     rename: '重命名',
     move: '移动',
     delete: '删除',
