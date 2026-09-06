@@ -75,12 +75,12 @@ const saveDashboardGroupId = (userId, studentId, groupId) => {
 const ORGANIZER_ICONS = {
   group: (props) => <Folder {...props} className="w-6 h-6" />,
   project: (props) => <Sparkles {...props} className="w-6 h-6" />,
-  drag: (props) => <GripVertical {...props} className="w-5 h-5" />,
-  up: (props) => <ArrowUp {...props} className="w-5 h-5" />,
-  down: (props) => <ArrowDown {...props} className="w-5 h-5" />,
-  rename: (props) => <Pencil {...props} className="w-5 h-5" />,
-  move: (props) => <MoveRight {...props} className="w-5 h-5" />,
-  delete: (props) => <Trash2 {...props} className="w-5 h-5" />
+  drag: (props) => <GripVertical {...props} />,
+  up: (props) => <ArrowUp {...props} />,
+  down: (props) => <ArrowDown {...props} />,
+  rename: (props) => <Pencil {...props} />,
+  move: (props) => <MoveRight {...props} />,
+  delete: (props) => <Trash2 {...props} />
 };
 
 const Dashboard = () => {
@@ -504,7 +504,7 @@ const Dashboard = () => {
         title={hasSelectedClass ? '分发给当前班级' : '请先选择班级'}
         aria-label={hasSelectedClass ? '分发给当前班级' : '请先选择班级'}
       >
-        <Send className="w-5 h-5" />
+        <Send />
       </button>
     );
   }, [handleDistributeProject, organizerActionPending]);
@@ -521,7 +521,7 @@ const Dashboard = () => {
         title="复制成我的项目"
         aria-label="复制成我的项目"
       >
-        <Copy className="w-5 h-5" />
+        <Copy />
       </button>
     );
   }, [handleCopyProject, organizerActionPending]);
