@@ -270,13 +270,17 @@
 .p5-project-organizer .p5-project-organizer__host-action {
   display: inline-grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
   border: 0;
   border-radius: 0.75rem;
   background: transparent;
   color: #94a3b8;
   cursor: pointer;
+  padding: 0;
+  line-height: 1;
   transition: color 150ms ease, background-color 150ms ease;
 }
 
